@@ -31,8 +31,20 @@ Modules = [MXNet.mx]
 Pages = ["optimizers/adadelta.jl"]
 ```
 
+### AdaMax
+```@autodocs
+Modules = [MXNet.mx]
+Pages = ["optimizers/adamax.jl"]
+```
+
 ### RMSProp
 ```@autodocs
 Modules = [MXNet.mx]
 Pages = ["optimizers/rmsprop.jl"]
+```
+
+### Nadam
+```@autodocs
+Modules = [MXNet.mx]
+Pages = ["optimizers/nadam.jl"]
 ```

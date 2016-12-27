@@ -76,7 +76,9 @@ function test_mnist_mlp()
   @test mnist_fit_and_predict(mx.ADAM(), mx.NormalInitializer(), 2) > 90
   @test mnist_fit_and_predict(mx.AdaGrad(), mx.NormalInitializer(), 2) > 90
   @test mnist_fit_and_predict(mx.AdaDelta(), mx.NormalInitializer(), 2) > 90
+  @test mnist_fit_and_predict(mx.AdaMax(), mx.NormalInitializer(), 2) > 90
   @test mnist_fit_and_predict(mx.RMSProp(), mx.NormalInitializer(), 2) > 90
+  @test mnist_fit_and_predict(mx.Nadam(), mx.NormalInitializer(), 2) > 90
 end
 
 test_mnist_mlp()
