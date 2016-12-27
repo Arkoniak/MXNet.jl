@@ -19,3 +19,20 @@ Modules = [MXNet.mx]
 Pages = ["optimizers/adam.jl"]
 ```
 
+### AdaGrad
+```@autodocs
+Modules = [MXNet.mx]
+Pages = ["optimizers/adagrad.jl"]
+```
+
+### AdaDelta
+```@autodocs
+Modules = [MXNet.mx]
+Pages = ["optimizers/adadelta.jl"]
+```
+
+### RMSProp
+```@autodocs
+Modules = [MXNet.mx]
+Pages = ["optimizers/rmsprop.jl"]
+```
