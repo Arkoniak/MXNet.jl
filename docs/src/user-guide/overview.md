@@ -301,7 +301,7 @@ name for each layer. We can also specify those names explicitly:
 ```julia
 net = mx.Variable(:data)
 w   = mx.Variable(:myweight)
-net = mx.FullyConnected(data=data, weight=w, name=:fc1, num_hidden=128)
+net = mx.FullyConnected(data=net, weight=w, name=:fc1, num_hidden=128)
 mx.list_arguments(net)
 # =>
 # 3-element Array{Symbol,1}:
