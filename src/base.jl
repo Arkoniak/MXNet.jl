@@ -248,7 +248,7 @@ function _defstruct_impl(is_immutable, name, fields)
     f_name, f_type = param
     :($f_name = convert($f_type, $f_name))
   end
-  asserts = map(filter(i -> isdefined(field_asserts,i), 1:length(fields))) do i
+  asserts = map(filter(i -> isassigned(field_asserts, i), 1:length(fields))) do i
     :(@assert($(field_asserts[i])))
   end
   construct = Expr(:call, name, field_names...)
