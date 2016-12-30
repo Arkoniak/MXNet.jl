@@ -44,22 +44,27 @@ function _split_inputs(batch_size :: Int, n_split :: Int)
   return idx
 end
 
-"""
-    FeedForward(arch :: SymbolicNode, ctx)
-
-# Arguments:
-* `arch`: the architecture of the network constructed using the symbolic API.
-* `ctx`: the devices on which this model should do computation. It could be a single `Context`
-         or a list of `Context` objects. In the latter case, data parallelization will be used
-         for training. If no context is provided, the default context `cpu()` will be used.
-"""
-function FeedForward(arch :: SymbolicNode; context :: Union{Context, Vector{Context}, Void} = nothing)
+function _get_context(context :: Union{Context, Vector{Context}, Void} = nothing)
   if isa(context, Void)
     context = [Context(CPU)]
   elseif isa(context, Context)
     context = [context]
   end
-  FeedForward(arch, context)
+
+  return context
+end
+
+"""
+    FeedForward(arch :: SymbolicNode, context)
+
+# Arguments:
+* `arch`: the architecture of the network constructed using the symbolic API.
+* `context`: the devices on which this model should do computation. It could be a single `Context`
+         or a list of `Context` objects. In the latter case, data parallelization will be used
+         for training. If no context is provided, the default context `cpu()` will be used.
+"""
+function FeedForward(arch :: SymbolicNode; context :: Union{Context, Vector{Context}, Void} = nothing)
+  FeedForward(arch, _get_context(context))
 end
 
 """
@@ -191,7 +196,7 @@ end
     for copying mini-batches of data. Since there is no concern about convergence in prediction, it is better
     to set the mini-batch size as large as possible (limited by your device memory) if prediction speed is a
     concern.
-    
+
     For the same reason, currently prediction will only use the first device even if multiple devices are
     provided to construct the model.
 
@@ -568,22 +573,52 @@ function fit(self :: FeedForward, optimizer :: AbstractOptimizer, data :: Abstra
   end # end of all epochs
 end
 
+"""
+    save_model(self, prefix, prefix_params)
+
+Save model to weight and data files.
+
+#  Arguments
+* `self::FeedForward`: model to be saved.
+* `prefix::AbstractString`: path prefix to file, where model weights should be stored.
+* `prefix_params::AbstractString`, default "data". Defines file where model data should be
+  stored.
+
+# Note
+As an example, if `prefix` is "~/Projects/mymodel", and `prefix_params` is
+"data", then
+* model weights are stored in "~/Projects/mymodel-symbol.json"
+* model_data is stored in "~/Projects/mymodel-data.params"
+"""
+function save_model(self :: FeedForward, prefix :: AbstractString,
+  prefix_params :: AbstractString="data")
+  save_model(self.arch, self.arg_params, self.aux_params, prefix, prefix_params)
+end
+function save_model(sym :: SymbolicNode, arg_params :: Dict{Base.Symbol, NDArray},
+                    aux_params :: Dict{Base.Symbol, NDArray}, prefix :: AbstractString,
+                    prefix_params :: AbstractString="data", notification="model")
+  mkpath(dirname(prefix))
+  save("$prefix-symbol.json", sym)
+  save_dict = merge(Dict([Symbol("arg:$k") => v for (k,v) in arg_params]),
+                    Dict([Symbol("aux:$k") => v for (k,v) in aux_params]))
+  save_filename = "$prefix-$prefix_params.params"
+  save(save_filename, save_dict)
+  info("Saved $notification to '$save_filename'")
+end
+
 function save_checkpoint(self :: FeedForward, prefix :: AbstractString, state :: OptimizationState)
   save_checkpoint(self.arch, self.arg_params, self.aux_params, prefix, state.curr_epoch)
 end
 function save_checkpoint(sym :: SymbolicNode, arg_params :: Dict{Base.Symbol, NDArray},
-                         aux_params :: Dict{Base.Symbol, NDArray}, prefix :: AbstractString, epoch :: Int)
-  save("$prefix-symbol.json", sym)
-  save_dict = merge(Dict([Symbol("arg:$k") => v for (k,v) in arg_params]),
-                    Dict([Symbol("aux:$k") => v for (k,v) in aux_params]))
-  save_filename = format("{1}-{2:04d}.params", prefix, epoch)
-  save(save_filename, save_dict)
-  info("Saved checkpoint to '$save_filename'")
+                         aux_params :: Dict{Base.Symbol, NDArray}, prefix :: AbstractString,
+                         epoch :: Int)
+  save_model(sym, arg_params, aux_params, prefix, format("{1:04d}", epoch), "checkpoint")
 end
 
-function load_checkpoint(prefix :: AbstractString, epoch :: Int)
+function _load_model(prefix :: AbstractString, prefix_params :: AbstractString = "data")
   arch       = load("$prefix-symbol.json", SymbolicNode)
-  saved_dict = load(format("{1}-{2:04d}.params", prefix, epoch), NDArray)
+  saved_dict_filename = "$prefix-$prefix_params.params"
+  saved_dict = load(saved_dict_filename, NDArray)
   arg_params = Dict{Base.Symbol, NDArray}()
   aux_params = Dict{Base.Symbol, NDArray}()
   for (k,v) in saved_dict
@@ -599,25 +634,106 @@ function load_checkpoint(prefix :: AbstractString, epoch :: Int)
   return (arch, arg_params, aux_params)
 end
 
-function load_checkpoint(prefix :: AbstractString, epoch :: Int, ::Type{FeedForward})
-  arch, arg_params, aux_params = load_checkpoint(prefix, epoch)
-  model = FeedForward(arch)
+"""
+    load_model(prefix, prefix_params, context)
+
+Load model from stored data.
+
+# Arguments
+* `prefix::AbstractString`: path prefix to file, where model weights are stored.
+* `prefix_params::AbstractString`, default "data". Defines file where model data is
+  stored.
+* `context`, default `nothing`. The devices on which this model should do
+  computation. It could be a single `Context` or a list of `Context` objects.
+  In the latter case, data parallelization will be used for training.
+  If no context is provided, the default context `cpu()` will be used.
+
+# Note
+As an example, if `prefix` is "~/Projects/mymodel", and `prefix_params` is
+"data", then
+* model weights are loaded from "~/Projects/mymodel-symbol.json"
+* model_data is loaded from "~/Projects/mymodel-data.params"
+"""
+function load_model(prefix :: AbstractString, prefix_params :: AbstractString = "data";
+    context :: Union{Context, Vector{Context}, Void} = nothing)
+  arch, arg_params, aux_params = _load_model(prefix, prefix_params)
+  model = FeedForward(arch, _get_context(context))
   model.arg_params = arg_params
   model.aux_params = aux_params
+
   return model
 end
 
+function load_checkpoint(prefix :: AbstractString, epoch :: Int)
+  _load_model(prefix, format("{1:04d}", epoch))
+end
+
+"""
+    load_checkpoint(prefix, epoch, Type{mx.FeedForward}, context)
+
+Load model from checkpoint files indicated by corresponding epoch.
+
+# Arguments
+* `prefix::AbstractString`: path prefix to file, where model weights are stored.
+* `epoch::Int`: epoch number, indicates file where weights of corresponding epoch
+  are stored.
+* `context`, default `nothing`. The devices on which this model should do
+  computation. It could be a single `Context` or a list of `Context` objects.
+  In the latter case, data parallelization will be used for training.
+  If no context is provided, the default context `cpu()` will be used.
+
+# Notes
+As an example, if `prefix` is "~/Projects/mymodel", and `epoch` is 5 then
+* model weights are loaded from "~/Projects/mymodel-symbol.json"
+* model data is loaded from "~/Projects/mymodel-0005.params"
+
+Corresponding function call is:
+```julia
+mx.load_checkpoint(prefix, 5, mx.FeedForward)             # default cpu context
+mx.load_checkpoint(prefix, 5, mx.FeedForward, mx.gpu(1))  # with gpu context
+```
+"""
+function load_checkpoint(prefix :: AbstractString, epoch :: Int,
+    ::Type{FeedForward}, context :: Union{Context, Vector{Context}, Void} = nothing)
+  load_model(prefix, format("{1:04d}", epoch), context=context)
+end
+
+"""
+    load_checkpoint(self :: FeedForward, ...)
+
+Alias for [`load_checkpoint!`](@ref)
+"""
 function load_checkpoint(self :: FeedForward, prefix :: AbstractString, epoch :: Int;
                          overwrite :: Bool = true, allow_different_arch :: Bool = false)
+  load_checkpoint!(self, prefix, epoch, overwrite, allow_different_arch)
+end
+
+"""
+    load_checkpoint!(self, prefix, epoch, overwrite, allow_different arch)
+
+Updates model with weights from checkpoint.
+
+# Arguments:
+* `self::FeedForward`: the model to be updated.
+* `prefix::AbstractString`: path prefix to file, where model weights are stored.
+* `epoch::Int`: epoch number, indicates file where weights of corresponding epoch
+  are stored.
+* `overwrite::Bool`: default `true`, should model weights be overwritten, if model
+  is already initialized.
+* `allow_different_arch::Bool`: default `false`. By default, model is not updated if
+  model architecture differs from the stored.
+"""
+function load_checkpoint!(self :: FeedForward, prefix :: AbstractString, epoch :: Int;
+                         overwrite :: Bool = true, allow_different_arch :: Bool = false)
   if isdefined(self, :arg_params) && isdefined(self, :aux_params) && !overwrite
-    info("model weights already exists, skip loading... (call with overwrite=true if needed)")
-    return self
+   info("model weights already exists, skip loading... (call with overwrite=true if needed)")
+   return self
   end
 
   arch, arg_params, aux_params = load_checkpoint(prefix, epoch)
   if !allow_different_arch
-    # TODO: is there better way to compare two symbols
-    @assert(to_json(self.arch) == to_json(arch), "Cannot load from a checkpoint with different network architecture")
+   # TODO: is there better way to compare two symbols
+   @assert(to_json(self.arch) == to_json(arch), "Cannot load from a checkpoint with different network architecture")
   end
   self.arg_params = arg_params
   self.aux_params = aux_params
