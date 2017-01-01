@@ -726,14 +726,14 @@ Updates model with weights from checkpoint.
 function load_checkpoint!(self :: FeedForward, prefix :: AbstractString, epoch :: Int;
                          overwrite :: Bool = true, allow_different_arch :: Bool = false)
   if isdefined(self, :arg_params) && isdefined(self, :aux_params) && !overwrite
-   info("model weights already exists, skip loading... (call with overwrite=true if needed)")
-   return self
+    info("model weights already exists, skip loading... (call with overwrite=true if needed)")
+    return self
   end
 
   arch, arg_params, aux_params = load_checkpoint(prefix, epoch)
   if !allow_different_arch
-   # TODO: is there better way to compare two symbols
-   @assert(to_json(self.arch) == to_json(arch), "Cannot load from a checkpoint with different network architecture")
+    # TODO: is there better way to compare two symbols
+    @assert(to_json(self.arch) == to_json(arch), "Cannot load from a checkpoint with different network architecture")
   end
   self.arg_params = arg_params
   self.aux_params = aux_params
