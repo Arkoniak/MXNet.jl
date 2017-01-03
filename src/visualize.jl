@@ -62,23 +62,23 @@ function to_graphviz(network :: SymbolicNode; title="Network Visualization", inp
       end
     elseif op == "Convolution"
       label = format("Convolution\nkernel={1}\nstride={2}\nn-filter={3}",
-                     _extract_shape(node["param"]["kernel"]),
-                     _extract_shape(node["param"]["stride"]),
-                     node["param"]["num_filter"])
+                     _extract_shape(node["attr"]["kernel"]),
+                     _extract_shape(node["attr"]["stride"]),
+                     node["attr"]["num_filter"])
       colorkey = 2
     elseif op == "FullyConnected"
-      label = format("FullyConnected\nnum-hidden={1}", node["param"]["num_hidden"])
+      label = format("FullyConnected\nnum-hidden={1}", node["attr"]["num_hidden"])
       colorkey = 2
     elseif op == "Activation"
-      label = format("Activation\nact-type={1}", node["param"]["act_type"])
+      label = format("Activation\nact-type={1}", node["attr"]["act_type"])
       colorkey = 3
     elseif op == "BatchNorm"
       colorkey = 4
     elseif op == "Pooling"
       label = format("Pooling\ntype={1}\nkernel={2}\nstride={3}",
-                     node["param"]["pool_type"],
-                     _extract_shape(node["param"]["kernel"]),
-                     _extract_shape(node["param"]["stride"]))
+                     node["attr"]["pool_type"],
+                     _extract_shape(node["attr"]["kernel"]),
+                     _extract_shape(node["attr"]["stride"]))
       colorkey = 5
     elseif op ∈ ("Concat", "Flatten", "Reshape")
       colorkey = 6
