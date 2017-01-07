@@ -120,8 +120,8 @@ function test_plus()
   a6 = copy(t6, mx.cpu())
   scalar_small = Float16(1e-5)
   scalar_large = Float16(1e4)
-  @test reldiff(t6 + scalar_small, copy(a6 .+ scalar_small)) < thresh
-  @test reldiff(t6 + scalar_large, copy(a6 .+ scalar_large)) < thresh
+  @test reldiff(t6 + scalar_small, copy(a6 .+ scalar_small)) < 1e-3
+  @test reldiff(t6 + scalar_large, copy(a6 .+ scalar_large)) < 1e-3
 end
 
 function test_minus()
@@ -169,10 +169,10 @@ function test_minus()
 
   t6 = zeros(Float16, dims)
   a6 = copy(t6, mx.cpu())
-  scalar_small = 1e-5
-  scalar_large = 1e4
-  @test reldiff(t6 - scalar_small, copy(a6 .- scalar_small)) < thresh
-  @test reldiff(t6 - scalar_large, copy(a6 .- scalar_large)) < thresh
+  scalar_small = Float16(1e-5)
+  scalar_large = Float16(1e4)
+  @test reldiff(t6 - scalar_small, copy(a6 .- scalar_small)) < 1e-3
+  @test reldiff(t6 - scalar_large, copy(a6 .- scalar_large)) < 1e-3
 end
 
 function test_mul()
