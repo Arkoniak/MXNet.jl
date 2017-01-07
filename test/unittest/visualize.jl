@@ -13,12 +13,8 @@ function test_basic()
 
   mlp = mlp2()
   
-<<<<<<< HEAD
-  @test mx.to_graphviz(mlp) == 
-=======
   # Order of elements or default color values can change, but length of the output should be more or less stable
   @test length(mx.to_graphviz(mlp)) == length(
->>>>>>> fix_scalar_ops
 """
 digraph "Network Visualization" {
 node [fontsize=10];
@@ -29,22 +25,11 @@ edge [fontsize=10];
 "activation0" -> "fc1"  [arrowtail=open,color="#737373",dir=back];
 "fc2" -> "activation0"  [arrowtail=open,color="#737373",dir=back];
 }
-<<<<<<< HEAD
-"""
-end
-
-=======
 """)
 end
->>>>>>> fix_scalar_ops
 ################################################################################
 # Run tests
 ################################################################################
 test_basic()
-<<<<<<< HEAD
 
 end
-
-=======
-end
->>>>>>> fix_scalar_ops
