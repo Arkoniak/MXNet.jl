@@ -931,6 +931,9 @@ end
 function _julia_to_mx_param(val :: Any)
   string(val)
 end
+function _julia_to_mx_param(val :: Float16)
+  string(val)
+end
 function _julia_to_mx_param(val :: Real)
   @sprintf("%e", val)
 end
