@@ -7,8 +7,9 @@ using ..Main: rand_dims, reldiff
 ################################################################################
 # Test Implementations
 ################################################################################
-function rand_tensors{N}(dims::NTuple{N, Int}, float_type=mx.MX_float)
-  tensor = rand(float_type, dims)
+rand_tensors{N}(dims::NTuple{N, Int}) = rand_tensors(mx.MX_float, dims)
+function rand_tensors{N, T}(::Type{T}, dims::NTuple{N, Int})
+  tensor = rand(T, dims)
   array  = copy(tensor, mx.cpu())
   return (tensor, array)
 end
@@ -120,8 +121,8 @@ function test_plus()
   a6 = copy(t6, mx.cpu())
   scalar_small = Float16(1e-5)
   scalar_large = Float16(1e4)
-  @test reldiff(t6 + scalar_small, copy(a6 .+ scalar_small)) < 1e-3
-  @test reldiff(t6 + scalar_large, copy(a6 .+ scalar_large)) < 1e-3
+  @test reldiff(t6 + scalar_small, copy(a6 .+ scalar_small)) < 1e-2
+  @test reldiff(t6 + scalar_large, copy(a6 .+ scalar_large)) < 1e-2
 end
 
 function test_minus()
@@ -171,8 +172,8 @@ function test_minus()
   a6 = copy(t6, mx.cpu())
   scalar_small = Float16(1e-5)
   scalar_large = Float16(1e4)
-  @test reldiff(t6 - scalar_small, copy(a6 .- scalar_small)) < 1e-3
-  @test reldiff(t6 - scalar_large, copy(a6 .- scalar_large)) < 1e-3
+  @test reldiff(t6 - scalar_small, copy(a6 .- scalar_small)) < 1e-2
+  @test reldiff(t6 - scalar_large, copy(a6 .- scalar_large)) < 1e-2
 end
 
 function test_mul()
@@ -198,19 +199,19 @@ function test_mul()
   @test reldiff(t3 * scalar, copy(a3 .* scalar)) < thresh
 
   # test small and large scalar
-  t4, a4 = rand_tensors(dims, Float32)
+  t4, a4 = rand_tensors(Float32, dims)
   scalar_small = 1e-8
   scalar_large = 1e8
   @test reldiff(t4 * scalar_small, copy(a4 .* scalar_small)) < thresh
   @test reldiff(t4 * scalar_large, copy(a4 .* scalar_large)) < thresh
   
-  t5, a5 = rand_tensors(dims, Float64)
+  t5, a5 = rand_tensors(Float64, dims)
   scalar_small = 1e-8
   scalar_large = 1e8
   @test reldiff(t5 * scalar_small, copy(a5 .* scalar_small)) < thresh
   @test reldiff(t5 * scalar_large, copy(a5 .* scalar_large)) < thresh
 
-  t6, a6 = rand_tensors(dims, Float16)
+  t6, a6 = rand_tensors(Float16, dims)
   scalar_small = Float16(1e-5)
   @test reldiff(t6 * scalar_small, copy(a6 .* scalar_small)) < 1e-1
 end
@@ -239,19 +240,19 @@ function test_div()
   @test reldiff(t2./scalar, copy(a2./scalar)) < thresh
 
   # test small and large scalar
-  t4, a4 = rand_tensors(dims, Float32)
+  t4, a4 = rand_tensors(Float32, dims)
   scalar_small = 1e-8
   scalar_large = 1e8
   @test reldiff(t4 / scalar_small, copy(a4 ./ scalar_small)) < thresh
   @test reldiff(t4 / scalar_large, copy(a4 ./ scalar_large)) < thresh
   
-  t5, a5 = rand_tensors(dims, Float64)
+  t5, a5 = rand_tensors(Float64, dims)
   scalar_small = 1e-8
   scalar_large = 1e8
   @test reldiff(t5 / scalar_small, copy(a5 ./ scalar_small)) < thresh
   @test reldiff(t5 / scalar_large, copy(a5 ./ scalar_large)) < thresh
 
-  t6, a6 = rand_tensors(dims, Float16)
+  t6, a6 = rand_tensors(Float16, dims)
   scalar_large = 1e4
   @test reldiff(t6 / scalar_large, copy(a6 ./ scalar_large)) < 1e-2
 end
