@@ -5,6 +5,23 @@ The abstract super type of all Modules in MXNet.jl
 """
 abstract AbstractModule
 
+# Taken from https://github.com/JuliaLang/julia/issues/19383
+macro import_fields(t)
+  tt = eval(t)
+  fields = fieldnames(tt)
+  ex = :()
+  for i = 1:length(fields)
+    ft = fieldtype(tt, fields[i])
+    if i==1
+      ex = :($(fields[i])::$(ft))
+    else
+      ex = :($ex ; $(fields[i]) :: $(ft))
+    end
+  end
+
+  return ex
+end
+
 """
     BaseModule
 
@@ -94,7 +111,7 @@ end
 ################################################################################
 
 # TODO add type of data_batch
-function forward_backward(self :: BaseModule, data_batch)
+function forward_backward(self :: AbstractModule, data_batch)
   forward(self, data_batch, is_train = true)
   backward(self)
 end
@@ -114,7 +131,7 @@ Run prediction on `eval_data` and evaluate the performance according to
 * `reset`: bool. Default `True`, indicating whether we should reset `eval_data` before starting evaluating.
 * `epoch` : int. Default 0. For compatibility, this will be passed to callbacks (if any). During training, this will correspond to the training epoch number.
 """
-function score(self :: BaseModule, eval_data, eval_metric, num_batches :: Int, batch_end_callback, score_end_callback, reset :: Bool = true, epoch :: Int = 0)
+function score(self :: AbstractModule, eval_data, eval_metric, num_batches :: Int, batch_end_callback, score_end_callback, reset :: Bool = true, epoch :: Int = 0)
   @assert(self.binded && self.params_initialized)
 
   if reset
@@ -137,7 +154,6 @@ function score(self :: BaseModule, eval_data, eval_metric, num_batches :: Int, b
 
     self.forward(eval_batch, is_train=False)
     self.update_metric(eval_metric, eval_batch.label)
-    b
 
     if batch_end_callback is not None:
         batch_end_params = BatchEndParam(epoch=epoch,
@@ -222,7 +238,7 @@ number of outputs.
 The objects in the results are `NDArray`s. If you need to work with numpy array,
 just call `.asnumpy()` on each of the `NDArray`.
 """
-function predict(self :: BaseModule, eval_data, num_batch=None, merge_batches=True, reset=True,
+function predict(self :: AbstractModule, eval_data, num_batch=None, merge_batches=True, reset=True,
                 always_output_list=False)
   @assert self.binded and self.params_initialized
 
@@ -316,7 +332,7 @@ Train the module parameters.
 * num_epoch : int
   Number of epochs to run training.
 """
-function fit!(self :: BaseModule, train_data, eval_data=None, eval_metric='acc',
+function fit!(self :: AbstractModule, train_data, eval_data=None, eval_metric='acc',
             epoch_end_callback=None, batch_end_callback=None, kvstore='local',
             optimizer='sgd', optimizer_params=(('learning_rate', 0.01),),
             eval_end_callback=None,
@@ -406,7 +422,7 @@ end
 
 A list of names for data required by this module.
 """
-function data_names(mod :: BaseModule)
+function data_names(mod :: AbstractModule)
   throw(MethodError(data_names, (typeof(mod), )))
 end
 
@@ -415,7 +431,7 @@ end
 
 A list of names for the outputs of this module.
 """
-function output_names(mod :: BaseModule)
+function output_names(mod :: AbstractModule)
   throw(MethodError(output_names, (typeof(mod), )))
 end
 
@@ -427,7 +443,7 @@ end
 
 A list of (name, shape) pairs specifying the data inputs to this module.  
 """
-function data_shapes(mod :: BaseModule)
+function data_shapes(mod :: AbstractModule)
   throw(MethodError(data_shapes, (typeof(mod), )))
 end
 
@@ -436,7 +452,7 @@ end
 
 A list of (name, shape) pairs specifying the label inputs to this module.  If this module does not accept labels -- either it is a module without loss function, or it is not binded for training, then this should return an empty list `[]`.
 """
-function label_shapes(mod :: BaseModule)
+function label_shapes(mod :: AbstractModule)
   throw(MethodError(label_shapes, (typeof(mod), )))
 end
 
@@ -445,7 +461,7 @@ end
 
 A list of (name, shape) pairs specifying the outputs of this module.
 """
-function output_shapes(mod :: BaseModule)
+function output_shapes(mod :: AbstractModule)
   throw(MethodError(output_shapes, (typeof(mod), )))
 end
 
@@ -460,7 +476,7 @@ Get parameters, those are potentially copies of the the actual parameters used t
 # Returns
 `(arg_params, aux_params)`, a pair of dictionary of name to value mapping.
 """
-function get_params(mod :: BaseModule)
+function get_params(mod :: AbstractModule)
   throw(MethodError(get_params, (typeof(mod), )))
 end
 
@@ -508,7 +524,7 @@ Forward computation.
 * data_batch : DataBatch. Could be anything with similar API implemented.
 * is_train : bool. Default is `None`, which means `is_train` takes the value of `self.for_training`.
 """
-function forward(mod :: BaseModule, data_batch, is_train=None)
+function forward(mod :: AbstractModule, data_batch, is_train=None)
   throw(MethodError(forward, (typeof(mod), )))
 end
 
@@ -520,7 +536,7 @@ Backward computation.
 # Arguments
 * `out_grads` : NDArray or list of NDArray, optional. Gradient on the outputs to be propagated back.  This parameter is only needed when bind is called on outputs that are not a loss function.
 """
-function backward(mod :: BaseModule, out_grads=None)
+function backward(mod :: AbstractModule, out_grads=None)
   throw(MethodError(backward, (typeof(mod), )))
 end
 
@@ -542,7 +558,7 @@ is like `[[out1_dev1, out1_dev2], [out2_dev1, out2_dev2]]`. All the output
 elements are `NDArray`. When `merge_multi_context` is `False`, those `NDArray`
 might live on different devices.
 """
-function get_outputs(mod :: BaseModule, merge_multi_context=True)
+function get_outputs(mod :: AbstractModule, merge_multi_context=True)
   throw(MethodError(get_outputs, (typeof(mod), )))
 end
 
@@ -564,7 +580,7 @@ is like `[[grad1_dev1, grad1_dev2], [grad2_dev1, grad2_dev2]]`. All the output
 elements are `NDArray`. When `merge_multi_context` is `False`, those `NDArray`
 might live on different devices.
 """
-function get_input_grads(mod :: BaseModule, merge_multi_context=True)
+function get_input_grads(mod :: AbstractModule, merge_multi_context=True)
   throw(MethodError(get_input_grads, (typeof(mod), )))
 end
 
@@ -573,7 +589,7 @@ end
 
 Update parameters according to the installed optimizer and the gradients computed in the previous forward-backward batch.
 """
-def update!(mod :: BaseModule)
+def update!(mod :: AbstractModule)
   throw(MethodError(update!, (typeof(mod), )))
 end
 
@@ -587,7 +603,7 @@ Evaluate and accumulate evaluation metric on outputs of the last forward computa
 * labels : list of NDArray
   Typically `data_batch.label`.
 """
-function update_metric!(mod :: BaseModule, eval_metric, labels)
+function update_metric!(mod :: AbstractModule, eval_metric, labels)
   throw(MethodError(update_metric!, (typeof(mod), )))
 end
 
@@ -624,7 +640,7 @@ can perform computation with the module.
 """
 function bind!(mod, data_shapes, label_shapes=None, for_training=True,
              inputs_need_grad=False, force_rebind=False, shared_module=None,
-             grad_req='write'):
+             grad_req=:write)
   throw(MethodError(bind!, (typeof(mod), )))
 end
 
