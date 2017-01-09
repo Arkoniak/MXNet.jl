@@ -1,155 +1,10 @@
 """
-    AbstractExecutorGroup
-
-Executor group is a convenient tool for managing a group of executors.
-"""
-abstract AbstractExecutorGroup
-
-type DataParallelExecutorGroup <: AbstractExecutorGroup
-  arch :: SymbolicNode
-  context :: Vector{Context}
-  for_training :: Bool
-
-  input_grad_arrays :: Vector{NDArray}
-  shared_data_arrays :: ???
-  arg_params
-  aux_params
-
-  DataParallelExecutorGroup(arch :: SymbolicNode, context :: Vector{Context}, for_training :: Bool) = new(arch, context, for_training)
-end
-function DataParallelExecutorGroup(arch :: SymbolicNode, context :: Vector{Context},
-                                   data :: AbstractDataProvider;
-                                   freeze_param_names :: Vector{Symbol} = [],
-                                   use_freeze_attr :: Bool = false,
-                                   inputs_need_grad :: Bool = false,
-                                   for_training :: Bool = true,
-                                   shared_group :: Union{Void, DataParallelExecutorGroup} = nothing,
-                                   grad_req :: GRAD_REQ = GRAD_WRITE)
-  exec_group = DataParallelExecutorGroup(arch, context, for_training, freeze_param_names)
-
-  if isa(shared_group, Void)
-    exec_group.shared_data_arrays = [Dict{???}() for _ in self.context]
-  else
-    exec_group.shared_data_arrays = shared_group.shared_data_arrays
-  end
-
-  bind_exec!(data_group, data, shared_group, inputs_need_grad)
-end
-
-# TODO use shared_group
-# TODO add workload - right now simpliest strategy is used
-function bind_exec!(self :: DataParallelExecutorGroup,
-                    data :: AbstractDataProvider,
-                    shared_group :: Union{Void, DataParallelExecutorGroup},
-                    inputs_need_grad)
-  num_dev     = length(self.context)
-  batch_size  = get_batch_size(data)
-  slices      = _split_inputs(batch_size, num_dev)
-
-  arg_names    = list_arguments(self.arch)
-  data_names   = [x[1] for x in provide_data(data)]
-  label_names  = [x[1] for x in provide_label(data)]
-  input_names  = [data_names; label_names]
-  param_names  = setdiff(arg_names, input_names)
-  aux_names    = list_auxiliary_states(self.arch)
-
-  grad_req_dict = Dict{Symbol, GRAD_REQ}()
-  if use_freeze_attr
-    # get grad attribute to allow for freezing
-    freeze_param_names = Symbol[]
-    for (attr, value) in list_all_attr(self.arch)
-      sattr = string(attr)
-      if endswith(sattr, "grad") && value == "freeze"
-        push!(freeze_param_names, Symbol(sattr[1:end-5]))
-      end
-    end
-  end
-
-  # Needs to correspond to the correct id in the update loop layer idx=1:length(param_names).
-  self.freeze_idx = filter(i -> in(param_names[i], freeze_param_names), 1:length(param_names))
-
-  # Setup grad_req as a dictionary
-  for param in arg_names
-    if param in param_names
-      if in(param, freeze_param_names)
-        grad_req_dict[param] = GRAD_NOP
-      else
-        grad_req_dict[param] = grad_req
-      end
-    elseif param in data_names
-      if inputs_need_grad
-        grad_req_dict[param] = grad_req
-      else
-        grad_req_dict[param] = GRAD_NOP
-      end
-    else
-      grad_req_dict[param] = GRAD_NOP
-    end
-  end
-  
-  train_execs = Array(Executor, num_dev)
-  for i = 1:num_dev
-    data_shapes = Dict([k => tuple(v[1:end-1]...,length(slices[i])) for (k,v) in provide_data(data)])
-    label_shapes = Dict([k => tuple(v[1:end-1]...,length(slices[i])) for (k,v) in provide_label(data)])
-    train_execs[i] = simple_bind(self.arch, self.context[i]; grad_req=grad_req_dict, data_shapes..., label_shapes...)
-    #= dbg_str = mx.debug_str(train_execs[i]) =#
-    #= info(string("TempSpace: ", split(dbg_str, ['\n'])[end-2]..., " on ", self.ctx[i])) =#
-
-    copy_params_from(train_execs[i], self.arg_params, self.aux_params)
-  end
-
-  # set up input data structures
-  self.data_arrays  = [SlicedNDArray[(slices[i], exec.arg_dict[name]) for (i,exec) in enumerate(train_execs)] for name in data_names]
-  self.label_arrays = [SlicedNDArray[(slices[i], exec.arg_dict[name]) for (i,exec) in enumerate(train_execs)] for name in label_names]
-
-  self.param_idx    = filter(i -> in(arg_names[i], param_names), 1:length(arg_names))
-  self.name_idx     = filter(i -> in(arg_names[i], data_names), 1:length(arg_names))
-
-  self.param_arrays = [NDArray[exec.arg_arrays[i] for exec in train_execs] for i in param_idx]
-  self.grad_arrays  = [NDArray[exec.grad_arrays[i] for exec in train_execs] for i in param_idx]
-  self.aux_arrays   = [NDArray[exec.aux_arrays[i] for exec in train_execs] for i = 1:length(aux_names)]
-
-  if inputs_need_grad
-    self.input_grad_arrays = [NDArray[exec.grad_arrays[i] for exec in train_execs] for i in name_idx]
-  else
-    self.input_grad_arrays = []
-  end
-
-  return self
-end
-
-
-
-
-"""
     AbstractModule
 
 The abstract super type of all Modules in MXNet.jl
-"""
-abstract AbstractModule
 
-# Taken from https://github.com/JuliaLang/julia/issues/19383
-macro import_fields(t)
-  tt = eval(t)
-  fields = fieldnames(tt)
-  ex = :()
-  for i = 1:length(fields)
-    ft = fieldtype(tt, fields[i])
-    if i==1
-      ex = :($(fields[i])::$(ft))
-    else
-      ex = :($ex ; $(fields[i]) :: $(ft))
-    end
-  end
-
-  return ex
-end
-
-"""
-    BaseModule
-
-`BaseModule` defines an API for modules.
- A module represents a computation component. The design purpose of a module is that it abstract a computation "machine", that one can run forward, backward, update parameters, etc. We aim to make the APIs easy to use, especially in the case when we need to use imperative API to work with multiple modules (e.g. stochastic depth network).
+`AbstractModule` defines an API for modules.
+A module represents a computation component. The design purpose of a module is that it abstract a computation "machine", that one can run forward, backward, update parameters, etc. We aim to make the APIs easy to use, especially in the case when we need to use imperative API to work with multiple modules (e.g. stochastic depth network).
 
 A module has several states:
 * Initial state. Memory is not allocated yet, not ready for computation yet.
@@ -194,8 +49,8 @@ And also the following richer information after binded:
     doing the computation.
   * `init_params(...)`: a more flexible interface to assign or initialize the parameters.
 * setup
-  * `bind()`: prepare environment for computation.
-  * `init_optimizer()`: install optimizer for parameter updating.
+  * `bind!()`: prepare environment for computation.
+  * `init_optimizer!()`: install optimizer for parameter updating.
 * computation
   * `forward(data_batch)`: forward operation.
   * `backward(out_grads=None)`: backward operation.
@@ -217,24 +72,22 @@ high-level API will be automatically available for a module:
 * `predict`: run prediction on a data set and collect outputs
 * `score`: run prediction on a data set and evaluate performance
 """
-type BaseModule <: AbstractModule
-  binded :: Bool
-  for_training :: Bool
-  inputs_need_grad :: Bool
-  params_initialized :: Bool
-  optimizer_initialized :: Bool
-  arch :: Union{Void, SymbolicNode}
+abstract AbstractModule
 
-  # leave the rest fields undefined
-  BaseModel() = new(false, false, false, false, false, nothing)
-end
+@defstruct ModuleState (
+  binded                :: Bool = false,
+  for_training          :: Bool = false,
+  inputs_need_grad      :: Bool = false,
+  params_initialized    :: Bool = false,
+  optimizer_initialized :: Bool = false
+)
 
 ################################################################################
 # High Level API
 ################################################################################
 
 # TODO add type of data_batch
-function forward_backward(self :: BaseModule, data_batch)
+function forward_backward(self :: AbstractModule, data_batch)
   forward(self, data_batch, is_train = true)
   backward(self)
 end
@@ -254,7 +107,7 @@ Run prediction on `eval_data` and evaluate the performance according to
 * `reset`: bool. Default `True`, indicating whether we should reset `eval_data` before starting evaluating.
 * `epoch` : int. Default 0. For compatibility, this will be passed to callbacks (if any). During training, this will correspond to the training epoch number.
 """
-function score(self :: BaseModule, eval_data, eval_metric, num_batches :: Int, batch_end_callback, score_end_callback, reset :: Bool = true, epoch :: Int = 0)
+function score(self :: AbstractModule, eval_data, eval_metric, num_batches :: Int, batch_end_callback, score_end_callback, reset :: Bool = true, epoch :: Int = 0)
   @assert(self.binded && self.params_initialized)
 
   if reset
@@ -313,7 +166,7 @@ Iterate over predictions.
 * `num_batch` : int. Default is `None`, indicating running all the batches in the data iterator.
 * `reset` : bool. Default is `True`, indicating whether we should reset the data iter before start doing prediction.
 """
-function iter_predict(self :: BaseModule, eval_data, num_batch=None, reset=True):
+function iter_predict(self :: AbstractModule, eval_data, num_batch=None, reset=True):
   @assert self.binded && self.params_initialized
 
   if reset
@@ -361,7 +214,7 @@ number of outputs.
 The objects in the results are `NDArray`s. If you need to work with numpy array,
 just call `.asnumpy()` on each of the `NDArray`.
 """
-function predict(self :: BaseModule, eval_data, num_batch=None, merge_batches=True, reset=True,
+function predict(self :: AbstractModule, eval_data, num_batch=None, merge_batches=True, reset=True,
                 always_output_list=False)
   @assert self.binded and self.params_initialized
 
@@ -455,7 +308,7 @@ Train the module parameters.
 * num_epoch : int
   Number of epochs to run training.
 """
-function fit!(self :: BaseModule, train_data, eval_data=None, eval_metric='acc',
+function fit!(self :: AbstractModule, train_data, eval_data=None, eval_metric='acc',
             epoch_end_callback=None, batch_end_callback=None, kvstore='local',
             optimizer='sgd', optimizer_params=(('learning_rate', 0.01),),
             eval_end_callback=None,

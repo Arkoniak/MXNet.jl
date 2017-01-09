@@ -26,15 +26,17 @@ init_optimizer!(mod, optimizer_params={'learning_rate':0.01, 'momentum': 0.9})
 metric = mx.metric.create('acc')
 
 for i_epoch in range(n_epoch):
-  for i_iter, batch in enumerate(train_dataiter):
+  for i_iter, batch in enumerate(each_batch(train_provider))
     mx.forward(mod, batch)
     mx.update_metric(mod, metric, batch.label)
 
     mx.backward(mod)
     mx.update(mod)
+  end
 
   for name, val in metric.get_name_value():
     print('epoch %03d: %s=%f' % (i_epoch, name, val))
+  end
   reset!(metric)
   reset!(train_dataiter)
 end

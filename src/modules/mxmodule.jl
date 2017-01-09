@@ -24,7 +24,7 @@ as the `FeedForward` model, except under the module API.
 """
 type MXModule <: AbstractModule
   arch :: SymbolicNode
-  base :: BaseModule
+  opts :: BaseModule
   data_provider :: AbstractDataProvider
   params_dirty :: Bool
   context :: Vector{Context}
@@ -48,16 +48,17 @@ function MXModule(arch :: SymbolicNode;
 end
 
 function bind!(mod :: MXModule, data_provider :: AbstractDataProvider; 
+               freeze_param_names :: Union{Void, Vector{Symbol}} = nothing,
                for_training :: Bool=true,
                inputs_need_grad :: Bool=false, 
                force_rebind :: Bool=false, 
                shared_module :: Union{Void, MXModule}=nothing,
-               grad_req :: Symbol=:write)
+               grad_req :: GRAD_REQ=GRAD_WRITE)
   if force_rebind
     _reset_bind!(mod)
   end
 
-  if mod.base.binded
+  if mod.opts.binded
     warn("Already binded, ignoring bind!()")
     return mod
 
@@ -65,45 +66,31 @@ function bind!(mod :: MXModule, data_provider :: AbstractDataProvider;
     @assert !inputs_need_grad
   end
 
-  mod.base.for_training = for_training
-  mod.base.inputs_need_grad = inputs_need_grad
-  mod.base.binded = true
+  mod.opts.for_training = for_training
+  mod.opts.inputs_need_grad = inputs_need_grad
+  mod.opts.binded = true
 
   mod.data_provider = data_provider
 
   if !isa(shared_module, Void)
-    @assert shared_module.base.binded && shared_module.base.params_initialized
-    #= shared_group = shared_module.exec_group =#
+    @assert shared_module.opts.binded && shared_module.opts.params_initialized
+    shared_group = shared_module.exec_group
   else
     shared_group = nothing
   end
 
   mod.exec_group = DataParallelExecutorGroup(mod.arch, mod.context, mod.data_provider,
+                                             freeze_param_names=freeze_param_names,
                                              for_training=for_training, 
                                              inputs_need_grad=inputs_need_grad,
                                              shared_group=shared_group, 
                                              grad_req=grad_req)
 
-  #= input_types = Dict([x.name => x.dtype for x in mod.data_shapes]) =#
-
-  #= if !isa(mod.label_shapes, Void) =#
-  #=   update!(input_types, Dict([x.name => x.dtype for x in mod.label_shapes])) =#
-  #= end =#
-
-    #= mod.exec_group = Executor() =#
-    #= mod.exec_group = DataParallelExecutorGroup(self._symbol, self._context, =#
-    #=                                                  self._work_load_list, self._data_shapes, =#
-    #=                                                  self._label_shapes, self._param_names, =#
-    #=                                                  for_training, inputs_need_grad, =#
-    #=                                                  shared_group, logger=self.logger, =#
-    #=                                                  fixed_param_names=self._fixed_param_names, =#
-    #=                                                  grad_req=grad_req, input_types=input_types) =#
-
   if !isa(shared_module, Void)
-    mod.base.params_initialized = true
+    mod.opts.params_initialized = true
     mod.arg_params = shared_module.arg_params
     mod.aux_params = shared_module.aux_params
-  elseif mod.base.params_initialized
+  elseif mod.opts.params_initialized
     # if the parameters are already initialized, we are re-binding
     # so automatically copy the already initialized params
     #= set_params!(mod, mod.exec_group, mod.arg_params, mod.aux_params) =#
@@ -117,14 +104,14 @@ function bind!(mod :: MXModule, data_provider :: AbstractDataProvider;
 end
 
 
-function init_params!(mod :: MXModule, initializer :: AbstractInitializer=Uniform(0.01), 
+function init_params!(mod :: MXModule, initializer :: AbstractInitializer=UniformInitializer(0.01), 
                       arg_params :: Dict{Base.Symbol, NDArray}=Dict{Base.Symbol, NDArray}(),
                       aux_params :: Dict{Base.Symbol, NDArray}=Dict{Base.Symbol, NDArray}(),
                     	allow_missing :: Bool=false, force_init :: Bool=false)
-	if mod.base.params_initialized && !force_init
+	if mod.opts.params_initialized && !force_init
 		return mod
   end
-  @assert binded(mod), 'call bind! before initializing the parameters'
+  @assert mod.opts.binded, 'call bind! before initializing the parameters'
 
   if !isdefined(mod, :arg_params) || isempty(mod.arg_params)
     #= param_arrays = [ =#
@@ -171,13 +158,94 @@ function init_params!(mod :: MXModule, initializer :: AbstractInitializer=Unifor
         for name, arr in self._aux_params.items():
             _impl(name, arr, aux_params)
 
-  mod.base.params_initialized = true
+  mod.opts.params_initialized = true
   mod.params_dirty = false
 
         # copy the initialized parameters to devices
   #= self._exec_group.set_params(self._arg_params, self._aux_params) =#
 
   return mod
+end
+
+# TODO add description
+function init_optimizer!(mod :: MXModule, optimizer, force_init :: Bool = false)
+  @assert mod.opts.binded && mod.opts.params_initialized
+
+  if mod.opts.optimizer_initialized && !force_init
+    warn("Optimizer already initialized, ignoring...")
+    return mod
+  end
+
+  # TODO initialize KV store
+
+  mod.optimizer = optimizer
+  mod.opts.optimizer_initialized = true
+  
+  # python voodoo magic
+  #= if self._preload_opt_states is not None: =#
+  #=    self.load_optimizer_states(self._preload_opt_states) =#
+  #=    self._preload_opt_states = None =#
+
+  return mod
+end
+
+# TODO add description
+"""
+    forward(module, data_batch, is_train)
+
+Forward computation.
+# Arguments
+
+* `data_batch` : DataBatch
+Could be anything with similar API implemented.
+* `is_train` : bool
+  Default is `None`, which means `is_train` takes the value of `self.for_training`.
+"""
+
+function forward(mod :: MXModule, data_batch, is_train :: Bool = false)
+  @assert mod.opts.binded && mod.opts.params_initialized
+
+  forward(mod.exec_group, data_batch, is_train)
+end
+
+"""
+    backward(module, out_grads)
+
+Backward computation.
+# Arguments
+* out_grads : NDArray or list of NDArray, optional
+  Gradient on the outputs to be propagated back.
+  This parameter is only needed when bind is called
+  on outputs that are not a loss function.
+"""
+function backward(mod :: MXModule, out_grads=nothing)
+  @assert mod.opts.binded && mod.opts.params_initialized
+
+  backward(mod.exec_group, out_grads=out_grads)
+end
+
+
+"""
+    update!(mod)
+
+Update parameters according to the installed optimizer and the gradients computed
+in the previous forward-backward batch.
+"""
+function update!(mod :: MXModule)
+  @assert mod.opts.binded && mod.opts.params_initialized && mod.opts.optimizer_initialized
+
+  mod.params_dirty = true
+  if mod.update_on_kvstore
+    _update_params_on_kvstore(mod.kvstore,
+                              self.exec_group.param_arrays,
+                              self.exec_group.grad_arrays)
+  else
+    _update_params(mod.kvstore,
+                   mod.exec_group.param_arrays,
+                   mod.exec_group.grad_arrays,
+                   updater=mod.updater,
+                   num_device=length(mod.context))
+  end
 end
 
 """
@@ -191,17 +259,15 @@ optimizer (esp. kvstore) is used.
 * `shared_module` : MXModule
 """
 function borrow_optimizer!(mod :: MXModule, shared_mod :: MXModule)
-  @assert shared_mod.base.optimizer_initialized
+  @assert shared_mod.opts.optimizer_initialized
   mod.optimizer = shared_mod.optimizer
   mod.kvstore = shared_mod.kvstore
   mod.update_on_kvstore = shared_mod.update_on_kvstore
   mod.updater = shared_mod.updater
-  mod.base.optimizer_initialized = true
+  mod.opts.optimizer_initialized = true
 end
 
 function _reset_bind!(mod :: MXModule)
-  mod.base.binded = false
-  mod.exec_group = ???
-  mod.data_shapes = ???
-  mod.label_shapes = ???
+  mod.opts.binded = false
+  mod.exec_group = DataParallelExecutorGroup()
 end
