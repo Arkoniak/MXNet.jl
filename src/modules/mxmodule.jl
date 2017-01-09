@@ -180,6 +180,87 @@ function init_params!(mod :: MXModule, initializer :: AbstractInitializer=Unifor
   return mod
 end
 
+# TODO add description
+function init_optimizer!(mod :: MXModule, optimizer, force_init :: Bool = false)
+  @assert mod.base.binded && mod.base.params_initialized
+
+  if mod.base.optimizer_initialized && !force_init
+    warn("Optimizer already initialized, ignoring...")
+    return mod
+  end
+
+  # TODO initialize KV store
+
+  mod.optimizer = optimizer
+  mod.base.optimizer_initialized = true
+  
+  # python voodoo magic
+  #= if self._preload_opt_states is not None: =#
+  #=    self.load_optimizer_states(self._preload_opt_states) =#
+  #=    self._preload_opt_states = None =#
+
+  return mod
+end
+
+# TODO add description
+"""
+    forward(module, data_batch, is_train)
+
+Forward computation.
+# Arguments
+
+* `data_batch` : DataBatch
+Could be anything with similar API implemented.
+* `is_train` : bool
+  Default is `None`, which means `is_train` takes the value of `self.for_training`.
+"""
+
+function forward(mod :: MXModule, data_batch, is_train :: Bool = false)
+  @assert mod.base.binded && mod.base.params_initialized
+
+  forward(mod.exec_group, data_batch, is_train)
+end
+
+"""
+    backward(module, out_grads)
+
+Backward computation.
+# Arguments
+* out_grads : NDArray or list of NDArray, optional
+  Gradient on the outputs to be propagated back.
+  This parameter is only needed when bind is called
+  on outputs that are not a loss function.
+"""
+function backward(mod :: MXModule, out_grads=nothing)
+  @assert mod.base.binded && mod.base.params_initialized
+
+  backward(mod.exec_group, out_grads=out_grads)
+end
+
+
+"""
+    update!(mod)
+
+Update parameters according to the installed optimizer and the gradients computed
+in the previous forward-backward batch.
+"""
+function update!(mod :: MXModule)
+  @assert mod.base.binded && mod.base.params_initialized && mod.base.optimizer_initialized
+
+  mod.params_dirty = true
+  if mod.update_on_kvstore
+    _update_params_on_kvstore(mod.kvstore,
+                              self.exec_group.param_arrays,
+                              self.exec_group.grad_arrays)
+  else
+    _update_params(mod.kvstore,
+                   mod.exec_group.param_arrays,
+                   mod.exec_group.grad_arrays,
+                   updater=mod.updater,
+                   num_device=length(mod.context))
+  end
+end
+
 """
 		borrow_optimizer!(module, shared_module)
 

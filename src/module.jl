@@ -19,8 +19,7 @@ type DataParallelExecutorGroup <: AbstractExecutorGroup
 end
 function DataParallelExecutorGroup(arch :: SymbolicNode, context :: Vector{Context},
                                    data :: AbstractDataProvider;
-                                   freeze_param_names :: Vector{Symbol} = [],
-                                   use_freeze_attr :: Bool = false,
+                                   freeze_param_names :: Union{Void, Vector{Symbol}} = nothing,
                                    inputs_need_grad :: Bool = false,
                                    for_training :: Bool = true,
                                    shared_group :: Union{Void, DataParallelExecutorGroup} = nothing,
@@ -33,7 +32,7 @@ function DataParallelExecutorGroup(arch :: SymbolicNode, context :: Vector{Conte
     exec_group.shared_data_arrays = shared_group.shared_data_arrays
   end
 
-  bind_exec!(data_group, data, shared_group, inputs_need_grad)
+  bind_exec!(exec_group, data, shared_group, inputs_need_grad)
 end
 
 # TODO use shared_group
@@ -54,7 +53,7 @@ function bind_exec!(self :: DataParallelExecutorGroup,
   aux_names    = list_auxiliary_states(self.arch)
 
   grad_req_dict = Dict{Symbol, GRAD_REQ}()
-  if use_freeze_attr
+  if isa(freeze_param_names, Void)
     # get grad attribute to allow for freezing
     freeze_param_names = Symbol[]
     for (attr, value) in list_all_attr(self.arch)
@@ -97,6 +96,7 @@ function bind_exec!(self :: DataParallelExecutorGroup,
 
     copy_params_from(train_execs[i], self.arg_params, self.aux_params)
   end
+  self.execs = train_execs
 
   # set up input data structures
   self.data_arrays  = [SlicedNDArray[(slices[i], exec.arg_dict[name]) for (i,exec) in enumerate(train_execs)] for name in data_names]
@@ -118,8 +118,36 @@ function bind_exec!(self :: DataParallelExecutorGroup,
   return self
 end
 
+"""
+    forward(exec_group, data_batch, is_train)
 
+Split `data_batch` according to workload and run forward on each devices.
 
+# Arguments
+* `data_batch` : DataBatch
+  Or could be any object implementing similar interface.
+* `is_train` : bool
+  The hint for the backend, indicating whether we are during training phase.
+  Default is `None`, then the value `self.for_training` will be used.
+"""
+function forward(exec_group :: DataParallelExecutorGroup, data_batch, is_train :: Union{Void, Bool} = nothing)
+
+  load_data!(exec_group.data, data_batch, exec_group.data_arrays)
+  if isa(is_train, Void)
+    is_train = exec_group.for_training
+  end
+  
+  if !isempty(exec_group.label_arrays)
+    @assert !is_train || data_batch.label???
+    if data_batch.label???
+      load_label!(exec_group.data, data_batch, label_arrays)
+    end
+  end
+
+  for exec in exec_group.execs
+    forward(exec, is_train=is_train)
+  end
+end
 
 """
     AbstractModule
