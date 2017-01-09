@@ -3,8 +3,8 @@
 
 A `MXModule` implement the `BaseModule` API by wrapping a `Symbol` and one or more `Executor` for data parallelization.
 
-Module is a basic module that wrap a `Symbol`. It is functionally the same
-    as the `FeedForward` model, except under the module API.
+MXModule is a basic module that wrap a `Symbol`. It is functionally the same
+as the `FeedForward` model, except under the module API.
 
 # Arguments
 * `symbol` : Symbol
@@ -23,56 +23,72 @@ Module is a basic module that wrap a `Symbol`. It is functionally the same
   Default `None`, indicating no network parameters are fixed.
 """
 type MXModule <: AbstractModule
-  
+  arch :: SymbolicNode
+  base :: BaseModule
+  data_provider :: AbstractDataProvider
+  params_dirty :: Bool
+  context :: Vector{Context}
+
+  arg_params :: Dict{Base.Symbol, NDArray}
+  aux_params :: Dict{Base.Symbol, NDArray}
+
   MXModule(arch :: SymbolicNode) = new(arch)
 end
+function MXModule(arch :: SymbolicNode; 
+                  context::Union{Void, Context, Vector{Context}})
+  mod = MXModule(arch)
+  if isa(context, Void)
+    mod.context = [Context(CPU)]
+  elseif isa(context, Context)
+    mod.context = [context]
+  else
+    mod.context = context
+  end
 
-function bind!(mod :: MXModule, data_shapes; 
-               label_shapes=nothing, 
+end
+
+function bind!(mod :: MXModule, data_provider :: AbstractDataProvider; 
                for_training :: Bool=true,
                inputs_need_grad :: Bool=false, 
                force_rebind :: Bool=false, 
-               shared_module :: AbstractModule=nothing,
+               shared_module :: Union{Void, MXModule}=nothing,
                grad_req :: Symbol=:write)
   if force_rebind
     _reset_bind!(mod)
   end
 
-  if mod.binded
+  if mod.base.binded
     warn("Already binded, ignoring bind!()")
     return mod
-
-  mod.for_training = for_training
-  mod.inputs_need_grad = inputs_need_grad
-  mod.binded = true
 
   if !for_training
     @assert !inputs_need_grad
   end
 
-  # TODO - fix these definitions
-  mod.data_shapes = data_shapes
-#            [x if isinstance(x, DataDesc) else DataDesc(*x) for x in data_shapes]
-  if !isa(label_shapes, Void)
-    mod.label_shapes = label_shapes
-#                [x if isinstance(x, DataDesc) else DataDesc(*x) for x in label_shapes]
-  else
-    mod.label_shapes = nothing
-  end
+  mod.base.for_training = for_training
+  mod.base.inputs_need_grad = inputs_need_grad
+  mod.base.binded = true
+
+  mod.data_provider = data_provider
 
   if !isa(shared_module, Void)
-    @assert isa(shared_module, AbstractModule) &&
-      shared_module.binded && shared_module.params_initialized
-    shared_group = shared_module.exec_group
+    @assert shared_module.base.binded && shared_module.base.params_initialized
+    #= shared_group = shared_module.exec_group =#
   else
     shared_group = nothing
   end
 
-  input_types = Dict([x.name => x.dtype for x in mod.data_shapes])
+  mod.exec_group = DataParallelExecutorGroup(mod.arch, mod.context, mod.data_provider,
+                                             for_training=for_training, 
+                                             inputs_need_grad=inputs_need_grad,
+                                             shared_group=shared_group, 
+                                             grad_req=grad_req)
 
-  if !isa(mod.label_shapes, Void)
-    update!(input_types, Dict([x.name => x.dtype for x in mod.label_shapes]))
-  end
+  #= input_types = Dict([x.name => x.dtype for x in mod.data_shapes]) =#
+
+  #= if !isa(mod.label_shapes, Void) =#
+  #=   update!(input_types, Dict([x.name => x.dtype for x in mod.label_shapes])) =#
+  #= end =#
 
     #= mod.exec_group = Executor() =#
     #= mod.exec_group = DataParallelExecutorGroup(self._symbol, self._context, =#
@@ -84,13 +100,13 @@ function bind!(mod :: MXModule, data_shapes;
     #=                                                  grad_req=grad_req, input_types=input_types) =#
 
   if !isa(shared_module, Void)
-    mod.params_initialized = true
+    mod.base.params_initialized = true
     mod.arg_params = shared_module.arg_params
     mod.aux_params = shared_module.aux_params
-  elseif mod.params_initialized
+  elseif mod.base.params_initialized
     # if the parameters are already initialized, we are re-binding
     # so automatically copy the already initialized params
-    set_params!(mod, mod.exec_group, mod.arg_params, mod.aux_params)
+    #= set_params!(mod, mod.exec_group, mod.arg_params, mod.aux_params) =#
   end
 
   if !isa(shared_module, Void) && shared_module.optimizer_initialized
@@ -100,9 +116,92 @@ function bind!(mod :: MXModule, data_shapes;
   return mod
 end
 
+
+function init_params!(mod :: MXModule, initializer :: AbstractInitializer=Uniform(0.01), 
+                      arg_params :: Dict{Base.Symbol, NDArray}=Dict{Base.Symbol, NDArray}(),
+                      aux_params :: Dict{Base.Symbol, NDArray}=Dict{Base.Symbol, NDArray}(),
+                    	allow_missing :: Bool=false, force_init :: Bool=false)
+	if mod.base.params_initialized && !force_init
+		return mod
+  end
+  @assert binded(mod), 'call bind! before initializing the parameters'
+
+  if !isdefined(mod, :arg_params) || isempty(mod.arg_params)
+    #= param_arrays = [ =#
+    #=     nd.zeros(x[0].shape, dtype=x[0].dtype) =#
+    #=     for x in self._exec_group.param_arrays =#
+    #= ] =#
+    #= mod.arg_params = {name:arr for name, arr in zip(self._param_names, param_arrays)} =#
+  end
+
+  if !isdefined(mod, :aux_params) || isempty(mod.aux_params)
+    #= aux_arrays = [ =#
+    #=     nd.zeros(x[0].shape, dtype=x[0].dtype) =#
+    #=     for x in self._exec_group.aux_arrays =#
+    #= ] =#
+    #= self._aux_params = {name:arr for name, arr in zip(self._aux_names, aux_arrays)} =#
+  end
+
+  for (k, v) in mod.arg_params
+  end
+
+  for (k, v) in mod.aux_params
+  end
+
+        def _impl(name, arr, cache):
+            """Internal helper for parameter initialization"""
+            if cache is not None:
+                if name in cache:
+                    cache_arr = cache[name]
+
+                    # just in case the cached array is just the target itself
+                    if cache_arr is not arr:
+                        cache_arr.copyto(arr)
+                else:
+                    if not allow_missing:
+                        raise RuntimeError("%s is not presented" % name)
+                    if initializer != None:
+                        initializer(name, arr)
+            else:
+                initializer(name, arr)
+
+        for name, arr in self._arg_params.items():
+            _impl(name, arr, arg_params)
+
+        for name, arr in self._aux_params.items():
+            _impl(name, arr, aux_params)
+
+  mod.base.params_initialized = true
+  mod.params_dirty = false
+
+        # copy the initialized parameters to devices
+  #= self._exec_group.set_params(self._arg_params, self._aux_params) =#
+
+  return mod
+end
+
+"""
+		borrow_optimizer!(module, shared_module)
+
+Borrow optimizer from a shared module. Used in bucketing, where exactly the same 
+optimizer (esp. kvstore) is used.
+
+# Arguments
+* `module` : MXModule
+* `shared_module` : MXModule
+"""
+function borrow_optimizer!(mod :: MXModule, shared_mod :: MXModule)
+  @assert shared_mod.base.optimizer_initialized
+  mod.optimizer = shared_mod.optimizer
+  mod.kvstore = shared_mod.kvstore
+  mod.update_on_kvstore = shared_mod.update_on_kvstore
+  mod.updater = shared_mod.updater
+  mod.base.optimizer_initialized = true
+end
+
 function _reset_bind!(mod :: MXModule)
-  self.binded = false
-  self.exec_group = ???
-  self.data_shapes = ???
-  self.label_shapes = ???
+  mod.base.binded = false
+  mod.exec_group = ???
+  mod.data_shapes = ???
+  mod.label_shapes = ???
 end

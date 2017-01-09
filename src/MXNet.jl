@@ -37,7 +37,7 @@ include("kvstore.jl")
 
 include("callback.jl")
 include("model.jl")
-include("module.jl")
+#= include("module.jl") =#
 
 include("visualize.jl")
 

@@ -18,7 +18,8 @@ train_provider, eval_provider = get_mnist_providers(batch_size)
 # Intermediate-level API
 ################################################################################
 mod = mx.MXModule(softmax)
-bind!(mod, data_shapes=train_dataiter.provide_data, label_shapes=train_dataiter.provide_label)
+#= bind!(mod, data_shapes=train_dataiter.provide_data, label_shapes=train_dataiter.provide_label) =#
+bind!(mod, data_provider=train_provider)
 init_params!(mod)
 
 init_optimizer!(mod, optimizer_params={'learning_rate':0.01, 'momentum': 0.9})
