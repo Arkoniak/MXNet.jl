@@ -25,7 +25,7 @@ function build_vocabulary(corpus_fn::AbstractString, vocab_fn::AbstractString; m
       end
     end
 
-    vocab = Dict([x.first => i for (i,x) in enumerate(vocab)])
+    vocab = map((x) -> x[2].first => x[1], enumerate(vocab))
   end
   vocab[UNKNOWN_CHAR] = length(vocab)
   return vocab
