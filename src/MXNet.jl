@@ -60,59 +60,59 @@ println("EXECUTOR.jl")
 println("=========================")
 include("executor.jl")
 
-#= println("=========================") =#
-#= info("METRIC.jl") =#
-#= println("METRIC.jl") =#
-#= println("=========================") =#
-#= include("metric.jl") =#
-#= println("=========================") =#
-#= info("OPTIMIZER.jl") =#
-#= println("OPTIMIZER.jl") =#
-#= println("=========================") =#
-#= include("optimizer.jl") =#
-#= println("=========================") =#
-#= info("INITIALIZER.jl") =#
-#= println("INITIALIZER.jl") =#
-#= println("=========================") =#
-#= include("initializer.jl") =#
+println("=========================")
+info("METRIC.jl")
+println("METRIC.jl")
+println("=========================")
+include("metric.jl")
+println("=========================")
+info("OPTIMIZER.jl")
+println("OPTIMIZER.jl")
+println("=========================")
+include("optimizer.jl")
+println("=========================")
+info("INITIALIZER.jl")
+println("INITIALIZER.jl")
+println("=========================")
+include("initializer.jl")
 
 println("=========================")
 info("IO.jl")
 println("IO.jl")
 println("=========================")
 include("io.jl")
-#= println("=========================") =#
-#= info("KVSTORE.jl") =#
-#= println("KVSTORE.jl") =#
-#= println("=========================") =#
-#= include("kvstore.jl") =#
+println("=========================")
+info("KVSTORE.jl")
+println("KVSTORE.jl")
+println("=========================")
+include("kvstore.jl")
 
-#= println("=========================") =#
-#= info("CALLBACK.jl") =#
-#= println("CALLBACK.jl") =#
-#= println("=========================") =#
-#= include("callback.jl") =#
-#= println("=========================") =#
-#= info("MODEL.jl") =#
-#= println("MODEL.jl") =#
-#= println("=========================") =#
-#= include("model.jl") =#
+println("=========================")
+info("CALLBACK.jl")
+println("CALLBACK.jl")
+println("=========================")
+include("callback.jl")
+println("=========================")
+info("MODEL.jl")
+println("MODEL.jl")
+println("=========================")
+include("model.jl")
 
-#= println("=========================") =#
-#= info("VISUALIZE.jl") =#
-#= println("VISUALIZE.jl") =#
-#= println("=========================") =#
-#= include("visualize.jl") =#
+println("=========================")
+info("VISUALIZE.jl")
+println("VISUALIZE.jl")
+println("=========================")
+include("visualize.jl")
 
-#= println("=========================") =#
-#= info("NN-FACTORY.jl") =#
-#= println("NN-FACTORY.jl") =#
-#= println("=========================") =#
-#= include("nn-factory.jl") =#
-#= println("=========================") =#
-#= info("END") =#
-#= println("END") =#
-#= println("=========================") =#
+println("=========================")
+info("NN-FACTORY.jl")
+println("NN-FACTORY.jl")
+println("=========================")
+include("nn-factory.jl")
+println("=========================")
+info("END")
+println("END")
+println("=========================")
 
 
 end # mx
