@@ -13,7 +13,14 @@ fi
 
 if [ ${TRAVIS_OS_NAME} == "linux" ]; then
   mkdir shadow_bin
-  ln -s `which gcc-4.8` shadow_bin/gcc
-  ln -s `which g++-4.8` shadow_bin/g++
+  ln -s `which gcc-5` shadow_bin/gcc
+  ln -s `which g++-5` shadow_bin/g++
+  # ln -s `which gcc-4.8` shadow_bin/gcc
+  # ln -s `which g++-4.8` shadow_bin/g++
   export PATH=$PWD/shadow_bin:$PATH
+  echo "test gcc"
+  gcc --version
+  echo "test g++"
+  g++ --version
+  echo "test complete"
 fi

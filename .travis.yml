@@ -23,8 +23,10 @@ addons:
       - libatlas-base-dev
       - libatlas-dev
       - libopencv-dev
-      - gcc-4.8
-      - g++-4.8
+      - gcc-5
+      - g++-5
+      # - gcc-4.8
+      # - g++-4.8
 
 before_install:
   - export TRAVIS=test/travis
