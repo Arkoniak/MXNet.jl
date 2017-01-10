@@ -565,6 +565,9 @@ function _define_data_iter_creator(hdr :: MX_handle)
           hdr, ref_name, ref_desc, ref_narg, ref_arg_names, ref_arg_types, ref_arg_descs)
 
   iter_name = Symbol(unsafe_wrap(String, ref_name[]))
+  info("_define_data ============================")
+  info(iter_name)
+  info("============================")
 
   isprovider =  endswith(string(iter_name), "Iter")
   signature = _format_signature(Int(ref_narg[]), ref_arg_names)
