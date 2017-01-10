@@ -931,11 +931,14 @@ end
 function _julia_to_mx_param(val :: Any)
   string(val)
 end
-function _julia_to_mx_param(val :: Float16)
-  string(val)
+function _julia_to_mx_param(val :: Float64)
+  @sprintf("%.16e", val)
 end
-function _julia_to_mx_param(val :: Real)
-  @sprintf("%e", val)
+function _julia_to_mx_param(val :: Float32)
+  @sprintf("%.8e", val)
+end
+function _julia_to_mx_param(val :: Float16)
+  @sprintf("%.4e", val)
 end
 
 # Import corresponding math functions from base so the automatically defined libmxnet

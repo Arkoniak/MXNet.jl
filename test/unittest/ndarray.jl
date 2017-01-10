@@ -121,8 +121,8 @@ function test_plus()
   a6 = copy(t6, mx.cpu())
   scalar_small = Float16(1e-5)
   scalar_large = Float16(1e4)
-  @test reldiff(t6 + scalar_small, copy(a6 .+ scalar_small)) < 1e-2
-  @test reldiff(t6 + scalar_large, copy(a6 .+ scalar_large)) < 1e-2
+  @test reldiff(t6 + scalar_small, copy(a6 .+ scalar_small)) < 1e-1
+  @test reldiff(t6 + scalar_large, copy(a6 .+ scalar_large)) < 1e-1
 end
 
 function test_minus()
@@ -172,8 +172,8 @@ function test_minus()
   a6 = copy(t6, mx.cpu())
   scalar_small = Float16(1e-5)
   scalar_large = Float16(1e4)
-  @test reldiff(t6 - scalar_small, copy(a6 .- scalar_small)) < 1e-2
-  @test reldiff(t6 - scalar_large, copy(a6 .- scalar_large)) < 1e-2
+  @test reldiff(t6 - scalar_small, copy(a6 .- scalar_small)) < 1e-1
+  @test reldiff(t6 - scalar_large, copy(a6 .- scalar_large)) < 1e-1
 end
 
 function test_mul()
@@ -213,7 +213,7 @@ function test_mul()
 
   t6, a6 = rand_tensors(Float16, dims)
   scalar_small = Float16(1e-5)
-  @test reldiff(t6 * scalar_small, copy(a6 .* scalar_small)) < 1e-2
+  @test reldiff(t6 * scalar_small, copy(a6 .* scalar_small)) < 1e-1
 end
 
 function test_div()
@@ -254,7 +254,7 @@ function test_div()
 
   t6, a6 = rand_tensors(Float16, dims)
   scalar_large = 1e4
-  @test reldiff(t6 / scalar_large, copy(a6 ./ scalar_large)) < 1e-2
+  @test reldiff(t6 / scalar_large, copy(a6 ./ scalar_large)) < 1e-1
 end
 
 function test_gd()
