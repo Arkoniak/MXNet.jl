@@ -27,6 +27,7 @@ addons:
       - g++-4.8
 
 before_install:
+  - sudo apt-get update
   - export TRAVIS=test/travis
   - source $TRAVIS/setup_env.sh
 

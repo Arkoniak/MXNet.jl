@@ -38,27 +38,27 @@ info("NDARRAY.jl")
 println("NDARRAY.jl")
 println("=========================")
 include("ndarray.jl")
-#= println("=========================") =#
-#= info("RANDOM.jl") =#
-#= println("RANDOM.jl") =#
-#= println("=========================") =#
-#= include("random.jl") =#
+println("=========================")
+info("RANDOM.jl")
+println("RANDOM.jl")
+println("=========================")
+include("random.jl")
 
-#= println("=========================") =#
-#= info("NAME.jl") =#
-#= println("NAME.jl") =#
-#= println("=========================") =#
-#= include("name.jl") =#
-#= println("=========================") =#
-#= info("SYMBOLIC-NODE.jl") =#
-#= println("SYMBOLIC-NODE.jl") =#
-#= println("=========================") =#
-#= include("symbolic-node.jl") =#
-#= println("=========================") =#
-#= info("EXECUTOR.jl") =#
-#= println("EXECUTOR.jl") =#
-#= println("=========================") =#
-#= include("executor.jl") =#
+println("=========================")
+info("NAME.jl")
+println("NAME.jl")
+println("=========================")
+include("name.jl")
+println("=========================")
+info("SYMBOLIC-NODE.jl")
+println("SYMBOLIC-NODE.jl")
+println("=========================")
+include("symbolic-node.jl")
+println("=========================")
+info("EXECUTOR.jl")
+println("EXECUTOR.jl")
+println("=========================")
+include("executor.jl")
 
 #= println("=========================") =#
 #= info("METRIC.jl") =#
