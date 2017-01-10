@@ -300,7 +300,7 @@ function test_saveload()
 
   # save and load dictionary of ndarrays
   names = [Symbol("array$i") for i = 1:n_arrays]
-  dict = Dict([n => v for (n,v) in zip(names, nd_arrays)])
+  dict = map((x) -> x[1] => x[2], zip(names, nd_arrays))
   mx.save(fname, dict)
   data = mx.load(fname, mx.NDArray)
   @test isa(data, Dict{Symbol, mx.NDArray})
