@@ -1,6 +1,8 @@
 module TestBind
+info("=====================TestBind========================")
 using MXNet
 using Base.Test
+info("=====================TestBind========================")
 
 using ..Main: rand_dims, reldiff
 
@@ -21,14 +23,17 @@ function test_arithmetic{T <: mx.DType}(::Type{T}, uf, gf)
   lhs_grad = mx.empty(T, shape)
   rhs_grad = mx.empty(T, shape)
 
+  info("1=========================================")
   exec2 = mx.bind(ret, mx.Context(mx.CPU), [lhs_arr, rhs_arr], args_grad=[lhs_grad, rhs_grad])
   exec3 = mx.bind(ret, mx.Context(mx.CPU), [lhs_arr, rhs_arr])
   exec4 = mx.bind(ret, mx.Context(mx.CPU), Dict(:lhs=>lhs_arr, :rhs=>rhs_arr),
                   args_grad=Dict(:rhs=>rhs_grad, :lhs=>lhs_grad))
+  info("2=========================================")
 
   mx.forward(exec2)
   mx.forward(exec3)
   mx.forward(exec4)
+  info("3=========================================")
 
   out1 = uf(copy(lhs_arr), copy(rhs_arr))
   out2 = copy(exec2.outputs[1])
@@ -38,6 +43,7 @@ function test_arithmetic{T <: mx.DType}(::Type{T}, uf, gf)
   @test isapprox(out1, out3)
   @test isapprox(out1, out4)
 
+  info("4=========================================")
   # test gradients
   out_grad = mx.NDArray(ones(T, shape))
   lhs_grad2, rhs_grad2 = gf(copy(out_grad), copy(lhs_arr), copy(rhs_arr))
@@ -45,6 +51,7 @@ function test_arithmetic{T <: mx.DType}(::Type{T}, uf, gf)
   @test isapprox(copy(lhs_grad), lhs_grad2)
   @test isapprox(copy(rhs_grad), rhs_grad2)
 
+  info("5=========================================")
   # reset grads
   lhs_grad[:] = 0
   rhs_grad[:] = 0
@@ -55,9 +62,13 @@ function test_arithmetic{T <: mx.DType}(::Type{T}, uf, gf)
 end
 
 function test_arithmetic()
+  info("+++++++++++++++++++++++++")
   for T in [mx.fromTypeFlag(TF) for TF in instances(mx.TypeFlag)]
+    info("a=========================================")
     test_arithmetic(T, .+, (g,x,y) -> (g,g))
+    info("b=========================================")
     test_arithmetic(T, .-, (g,x,y) -> (g,-g))
+    info("c=========================================")
     test_arithmetic(T, .*, (g,x,y) -> (y.*g, x.*g))
     if T <: Integer || T == Float16
       warn("Not running division test for $T")

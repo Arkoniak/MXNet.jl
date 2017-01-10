@@ -1,6 +1,8 @@
 module TestIO
+info("======================TestIO========================")
 using MXNet
 using Base.Test
+info("======================TestIO========================")
 
 using ..Main: rand_dims, reldiff
 
