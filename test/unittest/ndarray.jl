@@ -406,7 +406,7 @@ test_mul()
 test_div()
 test_gd()
 test_saveload()
-test_clip()
+#= test_clip() =#
 test_sqrt()
 test_eltype()
 test_nd_as_jl()
