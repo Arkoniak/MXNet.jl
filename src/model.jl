@@ -168,6 +168,10 @@ function _setup_predictor(self :: FeedForward, overwrite :: Bool=false; data_sha
   end
 end
 
+info("=============================")
+info("MODEL.jl: predict")
+info("=============================")
+
 """
     predict(self, data; overwrite=false, callback=nothing)
 
@@ -312,6 +316,10 @@ function _invoke_callbacks{T<:Real}(self::FeedForward, callbacks::Vector{Abstrac
   end
 end
 
+info("=============================")
+info("MODEL.jl: train")
+info("=============================")
+
 """
     train(model :: FeedForward, ...)
 
@@ -389,8 +397,8 @@ function fit(self :: FeedForward, optimizer :: AbstractOptimizer, data :: Abstra
 
   train_execs = Array(Executor, num_dev)
   for i = 1:num_dev
-    data_shapes = Dict([k => tuple(v[1:end-1]...,length(slices[i])) for (k,v) in provide_data(data)])
-    label_shapes = Dict([k => tuple(v[1:end-1]...,length(slices[i])) for (k,v) in provide_label(data)])
+    data_shapes = Dict(k => tuple(v[1:end-1]...,length(slices[i])) for (k,v) in provide_data(data))
+    label_shapes = Dict(k => tuple(v[1:end-1]...,length(slices[i])) for (k,v) in provide_label(data))
     train_execs[i] = simple_bind(self.arch, self.ctx[i]; grad_req=grad_req, data_shapes..., label_shapes...)
     dbg_str = mx.debug_str(train_execs[i])
     info(string("TempSpace: ", split(dbg_str, ['\n'])[end-2]..., " on ", self.ctx[i]))
@@ -573,6 +581,10 @@ function fit(self :: FeedForward, optimizer :: AbstractOptimizer, data :: Abstra
   end # end of all epochs
 end
 
+info("=============================")
+info("MODEL.jl: save_model")
+info("=============================")
+
 """
     save_model(self, prefix, prefix_params)
 
@@ -599,13 +611,16 @@ function save_model(sym :: SymbolicNode, arg_params :: Dict{Base.Symbol, NDArray
                     prefix_params :: AbstractString="data", notification="model")
   mkpath(dirname(prefix))
   save("$prefix-symbol.json", sym)
-  save_dict = merge(Dict([Symbol("arg:$k") => v for (k,v) in arg_params]),
-                    Dict([Symbol("aux:$k") => v for (k,v) in aux_params]))
+  save_dict = merge(Dict(Symbol("arg:$k") => v for (k,v) in arg_params),
+                    Dict(Symbol("aux:$k") => v for (k,v) in aux_params))
   save_filename = "$prefix-$prefix_params.params"
   save(save_filename, save_dict)
   info("Saved $notification to '$save_filename'")
 end
 
+info("=============================")
+info("MODEL.jl: save_checkpoint")
+info("=============================")
 function save_checkpoint(self :: FeedForward, prefix :: AbstractString, state :: OptimizationState)
   save_checkpoint(self.arch, self.arg_params, self.aux_params, prefix, state.curr_epoch)
 end
@@ -615,6 +630,9 @@ function save_checkpoint(sym :: SymbolicNode, arg_params :: Dict{Base.Symbol, ND
   save_model(sym, arg_params, aux_params, prefix, format("{1:04d}", epoch), "checkpoint")
 end
 
+info("=============================")
+info("MODEL.jl: _load_model")
+info("=============================")
 function _load_model(prefix :: AbstractString, prefix_params :: AbstractString = "data")
   arch       = load("$prefix-symbol.json", SymbolicNode)
   saved_dict_filename = "$prefix-$prefix_params.params"
@@ -633,6 +651,10 @@ function _load_model(prefix :: AbstractString, prefix_params :: AbstractString =
 
   return (arch, arg_params, aux_params)
 end
+
+info("=============================")
+info("MODEL.jl: load_model")
+info("=============================")
 
 """
     load_model(prefix, prefix_params, context)
@@ -667,6 +689,10 @@ end
 function load_checkpoint(prefix :: AbstractString, epoch :: Int)
   _load_model(prefix, format("{1:04d}", epoch))
 end
+
+info("=============================")
+info("MODEL.jl: load_checkpoint")
+info("=============================")
 
 """
     load_checkpoint(prefix, epoch, Type{mx.FeedForward}, context)
