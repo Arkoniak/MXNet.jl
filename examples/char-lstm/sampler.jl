@@ -36,7 +36,7 @@ output_samples = zeros(Char, (SAMPLE_LENGTH, BATCH_SIZE_SMP))
 output_samples[1, :] = SAMPLE_START
 
 # build inverse vocabulary for convenience
-inv_vocab = Dict([v => k for (k,v) in vocab])
+inv_vocab = map((x) -> x[2] => x[1], vocab)
 
 # do prediction and sampling step by step
 for t = 2:SAMPLE_LENGTH-1
