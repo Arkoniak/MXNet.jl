@@ -493,6 +493,9 @@ end
 function /(self :: SymbolicNode, arg :: Real)
   ./(self, arg)
 end
+function /(arg :: Real, self :: SymbolicNode)
+  _RDivScalar(self, scalar=arg)
+end
 function ./(arg :: Real, self :: SymbolicNode)
   _RDivScalar(self, scalar=arg)
 end

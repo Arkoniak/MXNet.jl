@@ -1,6 +1,11 @@
 module TestNDArray
 using MXNet
-using Base.Test
+if VERSION ≥ v"0.5.0-dev+7720"
+    using Base.Test
+else
+    using BaseTestNext
+    const Test = BaseTestNext
+end
 
 using ..Main: rand_dims, reldiff
 
@@ -397,20 +402,22 @@ end
 ################################################################################
 # Run tests
 ################################################################################
-test_assign()
-test_copy()
-test_slice()
-test_plus()
-test_minus()
-test_mul()
-test_div()
-test_gd()
-test_saveload()
-test_clip()
-test_sqrt()
-test_eltype()
-test_nd_as_jl()
-test_dot()
-test_kwargs()
+@testset "NDArray Test" begin
+  test_assign()
+  test_copy()
+  test_slice()
+  test_plus()
+  test_minus()
+  test_mul()
+  test_div()
+  test_gd()
+  test_saveload()
+  test_clip()
+  test_sqrt()
+  test_eltype()
+  test_nd_as_jl()
+  test_dot()
+  test_kwargs()
+end
 
 end
