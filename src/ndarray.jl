@@ -989,6 +989,9 @@ function _get_ndarray_function_def(name :: String)
       end
 
       args = collect(args)  # tuple to list
+      if length(args) == 0
+        args = MX_handle[]
+      end
 
       # XXX: hacky way of solving the problem that the arguments of `dot` should be swapped
       # See https://github.com/dmlc/MXNet.jl/issues/55
@@ -1003,9 +1006,11 @@ function _get_ndarray_function_def(name :: String)
         kwargs = Any[key != :axes ? (key, arg) : (key, reverse(map(i->length(arg)-i, arg))) for (key, arg) in kwargs]
       end
 
-      output_handles = [Base.cconvert(MX_handle, x) for x in output_vars]
-      if length(output_handles) > 0
-        output_handles_pp = [Base.cconvert(Ptr{MX_handle}, output_handles)]
+      if length(output_vars) > 0
+        output_handles = map((x) -> Base.cconvert(MX_handle, x), output_vars)
+        # XXX: Julia 0.4 has bug: [Array{MX_handle}] == Array{MX_handle}
+        output_handles_pp = Array{Array{MX_handle}}(1)
+        output_handles_pp[1] = Base.cconvert(Ptr{MX_handle}, output_handles)
       else
         output_handles_pp = [Base.convert(Ptr{MX_handle}, 0)]
       end

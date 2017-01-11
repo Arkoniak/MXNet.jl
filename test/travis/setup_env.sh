@@ -13,13 +13,8 @@ fi
 
 if [ ${TRAVIS_OS_NAME} == "linux" ]; then
   mkdir shadow_bin
-  # if [ ${TRAVIS_JULIA_VERSION} == "0.4" ]; then
-    ln -s `which gcc-4.8` shadow_bin/gcc
-    ln -s `which g++-4.8` shadow_bin/g++
-  # else
-  #   ln -s `which gcc-5` shadow_bin/gcc
-  #   ln -s `which g++-5` shadow_bin/g++
-  # fi
+  ln -s `which gcc-4.8` shadow_bin/gcc
+  ln -s `which g++-4.8` shadow_bin/g++
 
   export PATH=$PWD/shadow_bin:$PATH
 fi

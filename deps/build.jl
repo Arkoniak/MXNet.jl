@@ -1,13 +1,6 @@
 using Compat
 
 ################################################################################
-# Update versions for some of the required packages
-################################################################################
-if VERSION.major == 0 & VERSION.minor == 6
-  Pkg.checkout("JSON")
-end
-
-################################################################################
 # First try to detect and load existing libmxnet
 ################################################################################
 libmxnet_detected = false
