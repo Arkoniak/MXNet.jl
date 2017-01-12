@@ -114,61 +114,65 @@ function init_params!(mod :: MXModule, initializer :: AbstractInitializer=Unifor
   @assert mod.opts.binded, 'call bind! before initializing the parameters'
 
   if !isdefined(mod, :arg_params) || isempty(mod.arg_params)
-    #= param_arrays = [ =#
-    #=     nd.zeros(x[0].shape, dtype=x[0].dtype) =#
-    #=     for x in self._exec_group.param_arrays =#
-    #= ] =#
-    #= mod.arg_params = {name:arr for name, arr in zip(self._param_names, param_arrays)} =#
+    mod.arg_params = Dict(map((x) -> x[1] => zeros(size(x[2])), mod.exec_group.arg_params))
   end
 
   if !isdefined(mod, :aux_params) || isempty(mod.aux_params)
-    #= aux_arrays = [ =#
-    #=     nd.zeros(x[0].shape, dtype=x[0].dtype) =#
-    #=     for x in self._exec_group.aux_arrays =#
-    #= ] =#
-    #= self._aux_params = {name:arr for name, arr in zip(self._aux_names, aux_arrays)} =#
+    mod.aux_params = Dict(map((x) -> x[1] => zeros(size(x[2])), mod.exec_group.aux_params))
   end
 
-  for (k, v) in mod.arg_params
+  for (name, arr) in mod.arg_params
+    cache = arg_params
+    if !isempty(cache)
+      if haskey(cache, name)
+        # TODO check, may be it should be copy here, not equality
+        mod.arg_params[name] = cache[name]
+      else
+        if !allow_missing
+          ???
+          throw error "$name is not presented"
+        end
+
+        init(initializer, name, arr)
+      end
+    else
+      init(initializer, name, arr)
+    end
   end
 
   for (k, v) in mod.aux_params
+    cache = aux_params
+    if !isempty(cache)
+      if haskey(cache, name)
+        # TODO check, may be it should be copy here, not equality
+        mod.aux_params[name] = cache[name]
+      else
+        if !allow_missing
+          ???
+          throw error "$name is not presented"
+        end
+
+        init(initializer, name, arr)
+      end
+    else
+      init(initializer, name, arr)
+    end
   end
-
-        def _impl(name, arr, cache):
-            """Internal helper for parameter initialization"""
-            if cache is not None:
-                if name in cache:
-                    cache_arr = cache[name]
-
-                    # just in case the cached array is just the target itself
-                    if cache_arr is not arr:
-                        cache_arr.copyto(arr)
-                else:
-                    if not allow_missing:
-                        raise RuntimeError("%s is not presented" % name)
-                    if initializer != None:
-                        initializer(name, arr)
-            else:
-                initializer(name, arr)
-
-        for name, arr in self._arg_params.items():
-            _impl(name, arr, arg_params)
-
-        for name, arr in self._aux_params.items():
-            _impl(name, arr, aux_params)
 
   mod.opts.params_initialized = true
   mod.params_dirty = false
 
-        # copy the initialized parameters to devices
-  #= self._exec_group.set_params(self._arg_params, self._aux_params) =#
+  # copy the initialized parameters to devices
+  set_params!(mod.exec_group, mod.arg_params, mod.aux_params)
 
   return mod
 end
 
+function _create_kvstore(kvstore :: KVStore, num :: Int, arg_params)
+  kvstore, true
+end
 # TODO add description
-function init_optimizer!(mod :: MXModule, optimizer, force_init :: Bool = false)
+function init_optimizer!(mod :: MXModule, optimizer, force_init :: Bool = false, kvstore)
   @assert mod.opts.binded && mod.opts.params_initialized
 
   if mod.opts.optimizer_initialized && !force_init
@@ -177,14 +181,40 @@ function init_optimizer!(mod :: MXModule, optimizer, force_init :: Bool = false)
   end
 
   # TODO initialize KV store
+  # setup kvstore
+  kvstore, update_on_kvstore = _create_kvstore(kvstore, length(mod.ctx), mod.arg_params)
 
   mod.optimizer = optimizer
+  mod.kvstore = kvstore
+  mod.update_on_kvstore = update_on_kvstore
   mod.opts.optimizer_initialized = true
+
+  op_state = OptimizationState(batch_size)
+  optimizer.state = op_state
+
+  if !isa(kvstore, Void)
+    if update_on_kvstore
+      set_optimizer(kvstore, optimizer)
+    end
+
+    info("Initializing KVStore...")
+    # init kv with gradients
+    for idx = 1:length(param_arrays)
+      param_on_devs = param_arrays[idx]
+
+      init!(kvstore, idx, self.arg_params[param_names[idx]])
+
+      if update_on_kvstore
+        # pull weights back
+        pull!(kvstore, idx, param_on_devs, priority=-idx)
+      end
+    end
+  end
   
-  # python voodoo magic
-  #= if self._preload_opt_states is not None: =#
-  #=    self.load_optimizer_states(self._preload_opt_states) =#
-  #=    self._preload_opt_states = None =#
+  if !isa(mod.preload_opt_states, Void)
+    load_optimizer_states!(mod, mod.preload_opt_states)
+    mod.preload_opt_states = nothing
+  end
 
   return mod
 end
@@ -270,4 +300,23 @@ end
 function _reset_bind!(mod :: MXModule)
   mod.opts.binded = false
   mod.exec_group = DataParallelExecutorGroup()
+end
+
+"""
+    load_optimizer_states(module, filename)
+
+Load optimizer (updater) state from file
+
+# Arguments
+* `fname` : str
+  Path to input states file.
+"""
+function load_optimizer_states(mod :: MXModule, fname :: AbstractString)
+  @assert mod.opts.optimizer_initialized
+
+  if mod.update_on_kvstore
+    load_optimizer_states(mod.kvstore, fname)
+  else
+    set_states(mod.updater, read(fname))
+  end
 end
