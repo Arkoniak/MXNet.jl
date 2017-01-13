@@ -149,5 +149,6 @@ function forward(exec_group :: DataParallelExecutorGroup, data_batch, is_train :
   for exec in exec_group.execs
     forward(exec, is_train=is_train)
   end
+   # TODO add callbacks here
 end
 

@@ -1,7 +1,7 @@
 """
     MXModule
 
-A `MXModule` implement the `BaseModule` API by wrapping a `Symbol` and one or more `Executor` for data parallelization.
+A `MXModule` implement the `AbstractModule` API by wrapping a `Symbol` and one or more `Executor` for data parallelization.
 
 MXModule is a basic module that wrap a `Symbol`. It is functionally the same
 as the `FeedForward` model, except under the module API.
@@ -24,7 +24,7 @@ as the `FeedForward` model, except under the module API.
 """
 type MXModule <: AbstractModule
   arch :: SymbolicNode
-  opts :: BaseModule
+  opts :: ModuleState
   data_provider :: AbstractDataProvider
   params_dirty :: Bool
   context :: Vector{Context}
@@ -34,7 +34,7 @@ type MXModule <: AbstractModule
 
   MXModule(arch :: SymbolicNode) = new(arch)
 end
-function MXModule(arch :: SymbolicNode; 
+function MXModule(arch :: SymbolicNode, 
                   context::Union{Void, Context, Vector{Context}})
   mod = MXModule(arch)
   if isa(context, Void)
@@ -61,6 +61,7 @@ function bind!(mod :: MXModule, data_provider :: AbstractDataProvider;
   if mod.opts.binded
     warn("Already binded, ignoring bind!()")
     return mod
+  end
 
   if !for_training
     @assert !inputs_need_grad
@@ -111,7 +112,7 @@ function init_params!(mod :: MXModule, initializer :: AbstractInitializer=Unifor
 	if mod.opts.params_initialized && !force_init
 		return mod
   end
-  @assert mod.opts.binded, 'call bind! before initializing the parameters'
+  @assert mod.opts.binded, "call bind! before initializing the parameters"
 
   if !isdefined(mod, :arg_params) || isempty(mod.arg_params)
     mod.arg_params = Dict(map((x) -> x[1] => zeros(size(x[2])), mod.exec_group.arg_params))
@@ -121,43 +122,43 @@ function init_params!(mod :: MXModule, initializer :: AbstractInitializer=Unifor
     mod.aux_params = Dict(map((x) -> x[1] => zeros(size(x[2])), mod.exec_group.aux_params))
   end
 
-  for (name, arr) in mod.arg_params
-    cache = arg_params
-    if !isempty(cache)
-      if haskey(cache, name)
-        # TODO check, may be it should be copy here, not equality
-        mod.arg_params[name] = cache[name]
-      else
-        if !allow_missing
-          ???
-          throw error "$name is not presented"
-        end
+  #= for (name, arr) in mod.arg_params =#
+  #=   cache = arg_params =#
+  #=   if !isempty(cache) =#
+  #=     if haskey(cache, name) =#
+  #=       # TODO check, may be it should be copy here, not equality =#
+  #=       mod.arg_params[name] = cache[name] =#
+  #=     else =#
+  #=       if !allow_missing =#
+  #=         ??? =#
+  #=         throw error "$name is not presented" =#
+  #=       end =#
 
-        init(initializer, name, arr)
-      end
-    else
-      init(initializer, name, arr)
-    end
-  end
+  #=       init(initializer, name, arr) =#
+  #=     end =#
+  #=   else =#
+  #=     init(initializer, name, arr) =#
+  #=   end =#
+  #= end =#
 
-  for (k, v) in mod.aux_params
-    cache = aux_params
-    if !isempty(cache)
-      if haskey(cache, name)
-        # TODO check, may be it should be copy here, not equality
-        mod.aux_params[name] = cache[name]
-      else
-        if !allow_missing
-          ???
-          throw error "$name is not presented"
-        end
+  #= for (k, v) in mod.aux_params =#
+  #=   cache = aux_params =#
+  #=   if !isempty(cache) =#
+  #=     if haskey(cache, name) =#
+  #=       # TODO check, may be it should be copy here, not equality =#
+  #=       mod.aux_params[name] = cache[name] =#
+  #=     else =#
+  #=       if !allow_missing =#
+  #=         ??? =#
+  #=         throw error "$name is not presented" =#
+  #=       end =#
 
-        init(initializer, name, arr)
-      end
-    else
-      init(initializer, name, arr)
-    end
-  end
+  #=       init(initializer, name, arr) =#
+  #=     end =#
+  #=   else =#
+  #=     init(initializer, name, arr) =#
+  #=   end =#
+  #= end =#
 
   mod.opts.params_initialized = true
   mod.params_dirty = false
@@ -172,7 +173,7 @@ function _create_kvstore(kvstore :: KVStore, num :: Int, arg_params)
   kvstore, true
 end
 # TODO add description
-function init_optimizer!(mod :: MXModule, optimizer, force_init :: Bool = false, kvstore)
+function init_optimizer!(mod :: MXModule, optimizer, kvstore; force_init :: Bool = false)
   @assert mod.opts.binded && mod.opts.params_initialized
 
   if mod.opts.optimizer_initialized && !force_init
@@ -319,4 +320,13 @@ function load_optimizer_states(mod :: MXModule, fname :: AbstractString)
   else
     set_states(mod.updater, read(fname))
   end
+end
+
+"""
+    data_names(module)
+
+A list of names for data required by this module.
+"""
+function data_names(mod :: MXModule)
+  
 end

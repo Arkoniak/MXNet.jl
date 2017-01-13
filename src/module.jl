@@ -107,49 +107,50 @@ Run prediction on `eval_data` and evaluate the performance according to
 * `reset`: bool. Default `True`, indicating whether we should reset `eval_data` before starting evaluating.
 * `epoch` : int. Default 0. For compatibility, this will be passed to callbacks (if any). During training, this will correspond to the training epoch number.
 """
-function score(self :: AbstractModule, eval_data, eval_metric, num_batches :: Int, batch_end_callback, score_end_callback, reset :: Bool = true, epoch :: Int = 0)
-  @assert(self.binded && self.params_initialized)
+function score end
+#= function score(self :: AbstractModule, eval_data, eval_metric, num_batches :: Int, batch_end_callback, score_end_callback, reset :: Bool = true, epoch :: Int = 0) =#
+#=   @assert(self.binded && self.params_initialized) =#
 
-  if reset
-    reset!(eval_data)
-  end
+#=   if reset =#
+#=     reset!(eval_data) =#
+#=   end =#
 
-  # TODO emm... refactor
-  if !isa(eval_metric, EvalMetric)
-    eval_metric = metric.create(eval_metric)
-  end
+#=   # TODO emm... refactor =#
+#=   if !isa(eval_metric, EvalMetric) =#
+#=     eval_metric = metric.create(eval_metric) =#
+#=   end =#
 
-  reset!(eval_metric)
+#=   reset!(eval_metric) =#
 
-  actual_num_batch = 0
+#=   actual_num_batch = 0 =#
     
-  # TODO - convert to julia code!!!
-  for nbatch, eval_batch in enumerate(eval_data):
-    if num_batch is not None and nbatch == num_batch:
-        break
+#=   # TODO - convert to julia code!!! =#
+#=   for nbatch, eval_batch in enumerate(eval_data): =#
+#=     if num_batch is not None and nbatch == num_batch: =#
+#=         break =#
 
-    self.forward(eval_batch, is_train=False)
-    self.update_metric(eval_metric, eval_batch.label)
+#=     self.forward(eval_batch, is_train=False) =#
+#=     self.update_metric(eval_metric, eval_batch.label) =#
 
-    if batch_end_callback is not None:
-        batch_end_params = BatchEndParam(epoch=epoch,
-                                         nbatch=nbatch,
-                                         eval_metric=eval_metric,
-                                         locals=locals())
-        for callback in _as_list(batch_end_callback):
-            callback(batch_end_params)
-    actual_num_batch += 1
+#=     if batch_end_callback is not None: =#
+#=         batch_end_params = BatchEndParam(epoch=epoch, =#
+#=                                          nbatch=nbatch, =#
+#=                                          eval_metric=eval_metric, =#
+#=                                          locals=locals()) =#
+#=         for callback in _as_list(batch_end_callback): =#
+#=             callback(batch_end_params) =#
+#=     actual_num_batch += 1 =#
 
-  if score_end_callback:
-    params = BatchEndParam(epoch=epoch,
-                           nbatch=actual_num_batch,
-                           eval_metric=eval_metric,
-                           locals=locals())
-    for callback in _as_list(score_end_callback):
-        callback(params)
+#=   if score_end_callback: =#
+#=     params = BatchEndParam(epoch=epoch, =#
+#=                            nbatch=actual_num_batch, =#
+#=                            eval_metric=eval_metric, =#
+#=                            locals=locals()) =#
+#=     for callback in _as_list(score_end_callback): =#
+#=         callback(params) =#
 
-  return eval_metric.get_name_value()
-end
+#=   return eval_metric.get_name_value() =#
+#= end =#
 
 # TODO - convert python code to julian
 """
@@ -166,22 +167,23 @@ Iterate over predictions.
 * `num_batch` : int. Default is `None`, indicating running all the batches in the data iterator.
 * `reset` : bool. Default is `True`, indicating whether we should reset the data iter before start doing prediction.
 """
-function iter_predict(self :: AbstractModule, eval_data, num_batch=None, reset=True):
-  @assert self.binded && self.params_initialized
+function iter_predict end
+#= function iter_predict(self :: AbstractModule, eval_data, num_batch=None, reset=True): =#
+#=   @assert self.binded && self.params_initialized =#
 
-  if reset
-    reset!(eval_data)
-  end
+#=   if reset =#
+#=     reset!(eval_data) =#
+#=   end =#
 
-  for nbatch, eval_batch in enumerate(eval_data):
-    if num_batch is not None and nbatch == num_batch:
-        break
-    self.forward(eval_batch, is_train=False)
-    pad = eval_batch.pad
-    outputs = [out[0:out.shape[0]-pad] for out in self.get_outputs()]
+#=   for nbatch, eval_batch in enumerate(eval_data): =#
+#=     if num_batch is not None and nbatch == num_batch: =#
+#=         break =#
+#=     self.forward(eval_batch, is_train=False) =#
+#=     pad = eval_batch.pad =#
+#=     outputs = [out[0:out.shape[0]-pad] for out in self.get_outputs()] =#
 
-  yield (outputs, nbatch, eval_batch)
-end
+#=   yield (outputs, nbatch, eval_batch) =#
+#= end =#
 
 # TODO convert python code to julian
 """
@@ -214,42 +216,43 @@ number of outputs.
 The objects in the results are `NDArray`s. If you need to work with numpy array,
 just call `.asnumpy()` on each of the `NDArray`.
 """
-function predict(self :: AbstractModule, eval_data, num_batch=None, merge_batches=True, reset=True,
-                always_output_list=False)
-  @assert self.binded and self.params_initialized
+function predict end
+#= function predict(self :: AbstractModule, eval_data, num_batch=None, merge_batches=True, reset=True, =#
+#=                 always_output_list=False) =#
+#=   @assert self.binded and self.params_initialized =#
 
-  if reset:
-      eval_data.reset()
+#=   if reset: =#
+#=       eval_data.reset() =#
 
-  output_list = []
+#=   output_list = [] =#
 
-  for nbatch, eval_batch in enumerate(eval_data):
-      if num_batch is not None and nbatch == num_batch:
-          break
-      forward(self, eval_batch, is_train=False)
-      pad = eval_batch.pad
-      outputs = [out[0:out.shape[0]-pad].copy() for out in self.get_outputs()]
+#=   for nbatch, eval_batch in enumerate(eval_data): =#
+#=       if num_batch is not None and nbatch == num_batch: =#
+#=           break =#
+#=       forward(self, eval_batch, is_train=False) =#
+#=       pad = eval_batch.pad =#
+#=       outputs = [out[0:out.shape[0]-pad].copy() for out in self.get_outputs()] =#
 
-      output_list.append(outputs)
+#=       output_list.append(outputs) =#
 
-  if len(output_list) == 0:
-      return output_list
+#=   if len(output_list) == 0: =#
+#=       return output_list =#
 
-  if merge_batches:
-      num_outputs = len(output_list[0])
-      for out in output_list:
-          assert len(out) == num_outputs, \
-                 'Cannot merge batches, as num of outputs is not the same ' + \
-                 'in mini-batches. Maybe bucketing is used?'
-      output_list2 = [ndarray.concatenate([out[i] for out in output_list])
-                      for i in range(num_outputs)]
+#=   if merge_batches: =#
+#=       num_outputs = len(output_list[0]) =#
+#=       for out in output_list: =#
+#=           assert len(out) == num_outputs, \ =#
+#=                  'Cannot merge batches, as num of outputs is not the same ' + \ =#
+#=                  'in mini-batches. Maybe bucketing is used?' =#
+#=       output_list2 = [ndarray.concatenate([out[i] for out in output_list]) =#
+#=                       for i in range(num_outputs)] =#
 
-      if num_outputs == 1 and not always_output_list:
-          return output_list2[0]
-      return output_list2
+#=       if num_outputs == 1 and not always_output_list: =#
+#=           return output_list2[0] =#
+#=       return output_list2 =#
 
-  return output_list
-end
+#=   return output_list =#
+#= end =#
 
 # TODO convert python code to julian
 """
@@ -308,81 +311,82 @@ Train the module parameters.
 * num_epoch : int
   Number of epochs to run training.
 """
-function fit!(self :: AbstractModule, train_data, eval_data=None, eval_metric='acc',
-            epoch_end_callback=None, batch_end_callback=None, kvstore='local',
-            optimizer='sgd', optimizer_params=(('learning_rate', 0.01),),
-            eval_end_callback=None,
-            eval_batch_end_callback=None, initializer=Uniform(0.01),
-            arg_params=None, aux_params=None, allow_missing=False,
-            force_rebind=False, force_init=False, begin_epoch=0, num_epoch=None,
-            validation_metric=None, monitor=None)
+function fit! end
+#= function fit!(self :: AbstractModule, train_data, eval_data=None, eval_metric='acc', =#
+#=             epoch_end_callback=None, batch_end_callback=None, kvstore='local', =#
+#=             optimizer='sgd', optimizer_params=(('learning_rate', 0.01),), =#
+#=             eval_end_callback=None, =#
+#=             eval_batch_end_callback=None, initializer=Uniform(0.01), =#
+#=             arg_params=None, aux_params=None, allow_missing=False, =#
+#=             force_rebind=False, force_init=False, begin_epoch=0, num_epoch=None, =#
+#=             validation_metric=None, monitor=None) =#
 
-  @assert num_epoch is not None, 'please specify number of epochs'
+#=   @assert num_epoch is not None, 'please specify number of epochs' =#
 
-        self.bind(data_shapes=train_data.provide_data, label_shapes=train_data.provide_label,
-                  for_training=True, force_rebind=force_rebind)
-        if monitor is not None:
-            self.install_monitor(monitor)
-        self.init_params(initializer=initializer, arg_params=arg_params, aux_params=aux_params,
-                         allow_missing=allow_missing, force_init=force_init)
-        self.init_optimizer(kvstore=kvstore, optimizer=optimizer,
-                            optimizer_params=optimizer_params)
+#=         self.bind(data_shapes=train_data.provide_data, label_shapes=train_data.provide_label, =#
+#=                   for_training=True, force_rebind=force_rebind) =#
+#=         if monitor is not None: =#
+#=             self.install_monitor(monitor) =#
+#=         self.init_params(initializer=initializer, arg_params=arg_params, aux_params=aux_params, =#
+#=                          allow_missing=allow_missing, force_init=force_init) =#
+#=         self.init_optimizer(kvstore=kvstore, optimizer=optimizer, =#
+#=                             optimizer_params=optimizer_params) =#
 
-        if validation_metric is None:
-            validation_metric = eval_metric
-        if not isinstance(eval_metric, metric.EvalMetric):
-            eval_metric = metric.create(eval_metric)
+#=         if validation_metric is None: =#
+#=             validation_metric = eval_metric =#
+#=         if not isinstance(eval_metric, metric.EvalMetric): =#
+#=             eval_metric = metric.create(eval_metric) =#
 
-        ################################################################################
-        # training loop
-        ################################################################################
-        for epoch in range(begin_epoch, num_epoch):
-            tic = time.time()
-            eval_metric.reset()
-            for nbatch, data_batch in enumerate(train_data):
-                if monitor is not None:
-                    monitor.tic()
-                self.forward_backward(data_batch)
-                self.update()
-                self.update_metric(eval_metric, data_batch.label)
+#=         ################################################################################ =#
+#=         # training loop =#
+#=         ################################################################################ =#
+#=         for epoch in range(begin_epoch, num_epoch): =#
+#=             tic = time.time() =#
+#=             eval_metric.reset() =#
+#=             for nbatch, data_batch in enumerate(train_data): =#
+#=                 if monitor is not None: =#
+#=                     monitor.tic() =#
+#=                 self.forward_backward(data_batch) =#
+#=                 self.update() =#
+#=                 self.update_metric(eval_metric, data_batch.label) =#
 
-                if monitor is not None:
-                    monitor.toc_print()
+#=                 if monitor is not None: =#
+#=                     monitor.toc_print() =#
 
-                if batch_end_callback is not None:
-                    batch_end_params = BatchEndParam(epoch=epoch, nbatch=nbatch,
-                                                     eval_metric=eval_metric,
-                                                     locals=locals())
-                    for callback in _as_list(batch_end_callback):
-                        callback(batch_end_params)
+#=                 if batch_end_callback is not None: =#
+#=                     batch_end_params = BatchEndParam(epoch=epoch, nbatch=nbatch, =#
+#=                                                      eval_metric=eval_metric, =#
+#=                                                      locals=locals()) =#
+#=                     for callback in _as_list(batch_end_callback): =#
+#=                         callback(batch_end_params) =#
 
-            # one epoch of training is finished
-            for name, val in eval_metric.get_name_value():
-                self.logger.info('Epoch[%d] Train-%s=%f', epoch, name, val)
-            toc = time.time()
-            self.logger.info('Epoch[%d] Time cost=%.3f', epoch, (toc-tic))
+#=             # one epoch of training is finished =#
+#=             for name, val in eval_metric.get_name_value(): =#
+#=                 self.logger.info('Epoch[%d] Train-%s=%f', epoch, name, val) =#
+#=             toc = time.time() =#
+#=             self.logger.info('Epoch[%d] Time cost=%.3f', epoch, (toc-tic)) =#
 
-            # sync aux params across devices
-            arg_params, aux_params = self.get_params()
-            self.set_params(arg_params, aux_params)
+#=             # sync aux params across devices =#
+#=             arg_params, aux_params = self.get_params() =#
+#=             self.set_params(arg_params, aux_params) =#
 
-            if epoch_end_callback is not None:
-                for callback in _as_list(epoch_end_callback):
-                    callback(epoch, self.symbol, arg_params, aux_params)
+#=             if epoch_end_callback is not None: =#
+#=                 for callback in _as_list(epoch_end_callback): =#
+#=                     callback(epoch, self.symbol, arg_params, aux_params) =#
 
-            #----------------------------------------
-            # evaluation on validation set
-            if eval_data:
-                res = self.score(eval_data, validation_metric,
-                                 score_end_callback=eval_end_callback,
-                                 batch_end_callback=eval_batch_end_callback, epoch=epoch)
-                #TODO: pull this into default
-                for name, val in res:
-                    self.logger.info('Epoch[%d] Validation-%s=%f', epoch, name, val)
+#=             #---------------------------------------- =#
+#=             # evaluation on validation set =#
+#=             if eval_data: =#
+#=                 res = self.score(eval_data, validation_metric, =#
+#=                                  score_end_callback=eval_end_callback, =#
+#=                                  batch_end_callback=eval_batch_end_callback, epoch=epoch) =#
+#=                 #TODO: pull this into default =#
+#=                 for name, val in res: =#
+#=                     self.logger.info('Epoch[%d] Validation-%s=%f', epoch, name, val) =#
 
-            # end of 1 epoch, reset the data-iter for another epoch
-  train_data.reset()
-end
+#=             # end of 1 epoch, reset the data-iter for another epoch =#
+#=   train_data.reset() =#
+#= end =#
 
 ##########################################
 ##########################################
@@ -565,7 +569,7 @@ end
 
 Update parameters according to the installed optimizer and the gradients computed in the previous forward-backward batch.
 """
-def update!(mod :: AbstractModule)
+function update!(mod :: AbstractModule)
   throw(MethodError(update!, (typeof(mod), )))
 end
 
@@ -637,8 +641,7 @@ Install and initialize optimizers.
   Default `False`, indicating whether we should force re-initializing the
   optimizer in the case an optimizer is already installed.
 """
-function init_optimizer!(mod, kvstore='local', optimizer='sgd',
-                       optimizer_params=(('learning_rate', 0.01),), force_init=False):
+function init_optimizer!(mod, kvstore=:local, optimizer=SGD(), force_init=false)
   throw(MethodError(init_optimizer!, (typeof(mod), )))
 end
 
