@@ -7,6 +7,7 @@ The abstract super type of all Modules in MXNet.jl
 A module represents a computation component. The design purpose of a module is that it abstract a computation "machine", that one can run forward, backward, update parameters, etc. We aim to make the APIs easy to use, especially in the case when we need to use imperative API to work with multiple modules (e.g. stochastic depth network).
 
 A module has several states:
+
 * Initial state. Memory is not allocated yet, not ready for computation yet.
 * Binded. Shapes for inputs, outputs, and parameters are all known, memory allocated,
   ready for computation.
@@ -16,61 +17,53 @@ A module has several states:
   of the module can be updated according to the optimizer after gradients are computed
   (forward-backward).
 
-In order for a module to interact with others, a module should be able to report the
-following information in its raw stage (before binded)
-* `data_names`: list of string indicating the names of required data.
-* `output_names`: list of string indicating the names of required outputs.
+In order for a module to interact with others, a module should be able to report the following information in its raw stage (before binded)
+
+* [`data_names`](@ref): Names of required data.
+* [`output_names`](@ref): Names of the defined outputs.
 
 And also the following richer information after binded:
-* state information
-  * `binded`: `bool`, indicating whether the memory buffers needed for computation
-    has been allocated.
-  * `for_training`: whether the module is binded for training (if binded).
-  * `params_initialized`: `bool`, indicating whether the parameters of this modules
-    has been initialized.
-  * `optimizer_initialized`: 'bool`, indicating whether an optimizer is defined
-    and initialized.
-  * `inputs_need_grad`: `bool`, indicating whether gradients with respect to the
-    input data is needed. Might be useful when implementing composition of modules.
-* input/output information
-  * `data_shapes`: a list of `(name, shape)`. In theory, since the memory is allocated,
-    we could directly provide the data arrays. But in the case of data parallelization,
-    the data arrays might not be of the same shape as viewed from the external world.
-  * `label_shapes`: a list of `(name, shape)`. This might be `[]` if the module does
-    not need labels (e.g. it does not contains a loss function at the top), or a module
-    is not binded for training.
-  * `output_shapes`: a list of `(name, shape)` for outputs of the module.
-* parameters (for modules with parameters)
-  * `get_params()`: return a tuple `(arg_params, aux_params)`. Each of those
-    is a dictionary of name to `NDArray` mapping. Those `NDArray` always lives on
-    CPU. The actual parameters used for computing might live on other devices (GPUs),
-    this function will retrieve (a copy of) the latest parameters. Therefore, modifying
-  * `set_params(arg_params, aux_params)`: assign parameters to the devices
-    doing the computation.
-  * `init_params(...)`: a more flexible interface to assign or initialize the parameters.
-* setup
-  * `bind!()`: prepare environment for computation.
-  * `init_optimizer!()`: install optimizer for parameter updating.
-* computation
-  * `forward(data_batch)`: forward operation.
-  * `backward(out_grads=None)`: backward operation.
-  * `update()`: update parameters according to installed optimizer.
-  * `get_outputs()`: get outputs of the previous forward operation.
-  * `get_input_grads()`: get the gradients with respect to the inputs computed
-    in the previous backward operation.
-  * `update_metric(metric, labels)`: update performance metric for the previous forward
-     computed results.
-* other properties (mostly for backward compatability)
-  * `symbol`: the underlying symbolic graph for this module (if any)
-    This property is not necessarily constant. For example, for `BucketingModule`,
-    this property is simply the *current* symbol being used. For other modules,
-    this value might not be well defined.
+
+* State information
+    * [`isbinded`](@ref): indicating whether the memory buffers needed for computation
+    have been allocated.
+    * [`allows_training`](@ref): whether the module is binded for training (if binded).
+    * [`isinitialized`](@ref): indicating whether the parameters of this module have
+      been initialized.
+    * [`hasoptimizer`](@ref): indicating whether an optimizers is defined and intialized.
+    * [`inputs_need_grad`](@ref): indicating whether gradients with respect to the input data is needed. Might be useful when implementing composition of modules.
+* Input/Output information:
+  * [`data_shapes`](@ref): a list of `(name, shape)`. In theory, since the memory is allocated, we could directly provide the data arrays. But in the case of data parallelization, the data arrays might not be of the same shape as viewed from the external world.
+  * [`label_shapes`](@ref): a list of `(name, shape)`. This might be `[]` if the module does not need labels (e.g. it does not contains a loss function at the top), or a module is not binded for training.
+  * [`output_shapes`](@ref): a list of `(name, shape)` for outputs of the module.
+* Parameters (for modules with parameters):
+  * [`get_params()`](@ref): return a tuple `(arg_params, aux_params)`. Each of those is a dictionary of name to `NDArray` mapping. Those `NDArray` always lives on CPU. The actual parameters used for computing might live on other devices (GPUs), this function will retrieve (a copy of) the latest parameters. Therefore, modifying
+  * [`set_params`](@ref): assign parameters to the devices doing the computation.
+  * [`init_params`](@ref): a more flexible interface to assign or initialize the parameters.
+* Setup:
+  * [`bind!`](@ref): prepare environment for computation.
+  * [`init_optimizer!`](@ref): install optimizer for parameter updating.
+* Computation:
+  * [`forward`](@ref): forward operation.
+  * [`backward`](@ref): backward operation.
+  * [`update`](@ref): update parameters according to installed optimizer.
+  * [`get_outputs`](@ref): get outputs of the previous forward operation.
+  * [`get_input_grads`](@ref): get the gradients with respect to the inputs computed
+  in the previous backward operation.
+  * [`update_metric`](@ref): update performance metric for the previous forward
+  computed results.
+* Optional (mostly for backward compatability):
+* [`get_symbol`](@ref): the underlying symbolic graph for this module (if any)
+  This property is not necessarily constant. For example, for `BucketingModule`,
+  this property is simply the *current* symbol being used. For other modules,
+  this value might not be well defined.
 
 When those intermediate-level API are implemented properly, the following
 high-level API will be automatically available for a module:
-* `fit`: train the module parameters on a data set
-* `predict`: run prediction on a data set and collect outputs
-* `score`: run prediction on a data set and evaluate performance
+* [`fit`](@ref): train the module parameters on a data set
+* [`predict`](@ref): run prediction on a data set and collect outputs
+* [`score`](@ref): run prediction on a data set and evaluate performance
+* [`forward_backward`](@ref):
 """
 abstract AbstractModule
 
@@ -86,7 +79,6 @@ abstract AbstractModule
 # High Level API
 ################################################################################
 
-# TODO add type of data_batch
 function forward_backward(self :: AbstractModule, data_batch)
   forward(self, data_batch, is_train = true)
   backward(self)
@@ -99,6 +91,8 @@ end
 Run prediction on `eval_data` and evaluate the performance according to
         `eval_metric`.
 
+score(self::AbstractModule, eval_data, eval_metric; num_batch, batch_end_callback, reset=true, epoch=0)
+
 # Arguments
 * `eval_data`: DataIter
 * `eval_metric`: EvalMetric
@@ -107,50 +101,31 @@ Run prediction on `eval_data` and evaluate the performance according to
 * `reset`: bool. Default `True`, indicating whether we should reset `eval_data` before starting evaluating.
 * `epoch` : int. Default 0. For compatibility, this will be passed to callbacks (if any). During training, this will correspond to the training epoch number.
 """
-function score end
-#= function score(self :: AbstractModule, eval_data, eval_metric, num_batches :: Int, batch_end_callback, score_end_callback, reset :: Bool = true, epoch :: Int = 0) =#
-#=   @assert(self.binded && self.params_initialized) =#
+function score(self :: AbstractModule, eval_data, eval_metric; num_batch=nothing, batch_end_callback=nothing, reset=true, epoch=0)
+  @assert isbinded(self) && isinitialized(self)
 
-#=   if reset =#
-#=     reset!(eval_data) =#
-#=   end =#
+  reset && reset!(eval_data)
+  reset!(eval_metric)
 
-#=   # TODO emm... refactor =#
-#=   if !isa(eval_metric, EvalMetric) =#
-#=     eval_metric = metric.create(eval_metric) =#
-#=   end =#
+  for (nbatch, eval_batch) in enumerate(eval_data)
+    if num_batch !== nothing && nbatch == num_back
+      break
+    end
 
-#=   reset!(eval_metric) =#
+    forward(self, eval_batch, is_train=false)
+    update_metric(self, eval_metric, label(eval_batch))
 
-#=   actual_num_batch = 0 =#
-    
-#=   # TODO - convert to julia code!!! =#
-#=   for nbatch, eval_batch in enumerate(eval_data): =#
-#=     if num_batch is not None and nbatch == num_batch: =#
-#=         break =#
+    if batch_end_callback !== nothing
+      error("Not implemented yet!")
+    end
 
-#=     self.forward(eval_batch, is_train=False) =#
-#=     self.update_metric(eval_metric, eval_batch.label) =#
+    if score_end_callback !== nothing
+      error("Not implemented yet!")
+    end
 
-#=     if batch_end_callback is not None: =#
-#=         batch_end_params = BatchEndParam(epoch=epoch, =#
-#=                                          nbatch=nbatch, =#
-#=                                          eval_metric=eval_metric, =#
-#=                                          locals=locals()) =#
-#=         for callback in _as_list(batch_end_callback): =#
-#=             callback(batch_end_params) =#
-#=     actual_num_batch += 1 =#
-
-#=   if score_end_callback: =#
-#=     params = BatchEndParam(epoch=epoch, =#
-#=                            nbatch=actual_num_batch, =#
-#=                            eval_metric=eval_metric, =#
-#=                            locals=locals()) =#
-#=     for callback in _as_list(score_end_callback): =#
-#=         callback(params) =#
-
-#=   return eval_metric.get_name_value() =#
-#= end =#
+  end
+  get(eval_metric)
+end
 
 # TODO - convert python code to julian
 """
@@ -216,43 +191,23 @@ number of outputs.
 The objects in the results are `NDArray`s. If you need to work with numpy array,
 just call `.asnumpy()` on each of the `NDArray`.
 """
-function predict end
-#= function predict(self :: AbstractModule, eval_data, num_batch=None, merge_batches=True, reset=True, =#
-#=                 always_output_list=False) =#
-#=   @assert self.binded and self.params_initialized =#
+function predict(self::AbstractModule, eval_data;
+                 num_batch=nothing, merge_batches=true, reset=true)
+  @assert isbinded(self) && isinitialized(self)
 
-#=   if reset: =#
-#=       eval_data.reset() =#
+  reset && reset!(eval_data)
 
-#=   output_list = [] =#
+  for (nbatch, eval_batch) in enumerate(eval_data)
+    if num_batch !== nothing && nbatch == num_back
+      break
+    end
+    forward(self, eval_batch, is_train=false)
 
-#=   for nbatch, eval_batch in enumerate(eval_data): =#
-#=       if num_batch is not None and nbatch == num_batch: =#
-#=           break =#
-#=       forward(self, eval_batch, is_train=False) =#
-#=       pad = eval_batch.pad =#
-#=       outputs = [out[0:out.shape[0]-pad].copy() for out in self.get_outputs()] =#
+    outputs = get_outputs(self)
 
-#=       output_list.append(outputs) =#
-
-#=   if len(output_list) == 0: =#
-#=       return output_list =#
-
-#=   if merge_batches: =#
-#=       num_outputs = len(output_list[0]) =#
-#=       for out in output_list: =#
-#=           assert len(out) == num_outputs, \ =#
-#=                  'Cannot merge batches, as num of outputs is not the same ' + \ =#
-#=                  'in mini-batches. Maybe bucketing is used?' =#
-#=       output_list2 = [ndarray.concatenate([out[i] for out in output_list]) =#
-#=                       for i in range(num_outputs)] =#
-
-#=       if num_outputs == 1 and not always_output_list: =#
-#=           return output_list2[0] =#
-#=       return output_list2 =#
-
-#=   return output_list =#
-#= end =#
+    error("Not yet implemented")
+  end
+end
 
 # TODO convert python code to julian
 """
@@ -461,20 +416,24 @@ function get_params(mod :: AbstractModule)
 end
 
 """
-    init_params!(TODO...)
+    init_params!(module; kwargs...)
 
 Initialize the parameters and auxiliary states.
 
 # Arguments
-* initializer : Initializer.  Called to initialize parameters if needed.
-* arg_params : dict.  If not None, should be a dictionary of existing arg_params. Initialization will be copied from that.
-* aux_params : dict.  If not None, should be a dictionary of existing aux_params. Initialization will be copied from that.
-* allow_missing : bool.  If true, params could contain missing values, and the initializer will be called to fill those missing params.
-* force_init : bool.  If true, will force re-initialize even if already initialized.
+* `module` : `AbstractModule`
+* `initializer` : `AbstractInitializer`.  Called to initialize parameters if needed.
+* `arg_params` : `Dict{Symbol, NDArray}`.  If not empty, should be a dictionary of existing `arg_params`. Initialization will be copied from that.
+* `aux_params` : `Dict{Symbol, NDArray}`.  If not empty, should be a dictionary of existing `aux_params`. Initialization will be copied from that.
+* `allow_missing` : `Bool`.  If true, params could contain missing values, and the initializer will be called to fill those missing params.
+* `force_init` : `Bool`.  If true, will force re-initialize even if already initialized.
 """
-function init_params!(mod, initializer=Uniform(0.01), arg_params=nothing, aux_params=nothing,
-                    allow_missing=false, force_init=false)
-  throw(MethodError(init_params, (typeof(mod), )))
+function init_params!(mod; 
+    initializer :: AbstractInitializer=UniformInitializer(0.01), 
+    arg_params :: Dict{Base.Symbol, NDArray}=Dict{Base.Symbol, NDArray}(),
+    aux_params :: Dict{Base.Symbol, NDArray}=Dict{Base.Symbol, NDArray}(),
+    allow_missing :: Bool=false, force_init :: Bool=false)
+  throw(MethodError(init_params!, (typeof(mod), )))
 end
 
 """
@@ -488,7 +447,7 @@ Assign parameter and aux state values.
 * allow_missing : bool.  If true, params could contain missing values, and the initializer will be called to fill those missing params.
 * force_init : bool.  If true, will force re-initialize even if already initialized.
 """
-function set_params!(self, arg_params, aux_params, allow_missing=False, force_init=True)
+function set_params!(self :: AbstractModule, arg_params, aux_params; allow_missing=False, force_init=True)
   init_params!(self, initializer=None, arg_params=arg_params, aux_params=aux_params, allow_missing=allow_missing, force_init=force_init)
 end
 
@@ -645,6 +604,16 @@ function init_optimizer!(mod, kvstore=:local, optimizer=SGD(), force_init=false)
   throw(MethodError(init_optimizer!, (typeof(mod), )))
 end
 
+################################################################################
+# Optional
+################################################################################
+"""
+    get_symbol(self::AbstractModule) -> Nullable{SymbolicNode}
+Returns the associated [`SymbolicNode`](@ref) of the module. It might not be defined or change over time.
+"""
+function get_symbol(self::AbstractModule)
+  return Nullable{SymbolicNode}()
+end
 
 include("modules/mxmodule.jl")
 include("modules/julia_module.jl")

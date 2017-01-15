@@ -135,7 +135,7 @@ Split `data_batch` according to workload and run forward on each devices.
   The hint for the backend, indicating whether we are during training phase.
   Default is `None`, then the value `self.for_training` will be used.
 """
-function forward(exec_group :: DataParallelExecutorGroup, data_batch, is_train :: Union{Void, Bool} = nothing)
+function forward!(exec_group :: DataParallelExecutorGroup, data_batch, is_train :: Union{Void, Bool} = nothing)
 
   load_data!(exec_group.data_provider, data_batch, exec_group.data_arrays)
   if isa(is_train, Void)
@@ -152,3 +152,7 @@ function forward(exec_group :: DataParallelExecutorGroup, data_batch, is_train :
    # TODO add callbacks here
 end
 
+function output_shapes(exec_group :: DataParallelExecutorGroup)
+  outputs = [size(out) for out in exec_group.execs[1].outputs]
+  [tuple(key, shape) for key, shape in zip(lis_outputs(exec_group.arch), outputs)]
+end

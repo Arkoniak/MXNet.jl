@@ -22,10 +22,20 @@ function test_create()
   @test mx.output_names(mod) == [:fc2_output]
 end
 
+function test_bind()
+  info("MXModule::bind")
+
+  mlp = mlp2()
+  mod = mx.MXModule(mlp)
+
+
+end
+
 ################################################################################
 # Run tests
 ################################################################################
 @testset "MXModule Test" begin
   test_create()
+  test_bind()
 end
 end

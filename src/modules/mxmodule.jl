@@ -28,26 +28,34 @@ type MXModule <: AbstractModule
   data_provider :: AbstractDataProvider
   params_dirty :: Bool
   context :: Vector{Context}
+  data_names :: Union{Void, Vector{Base.Symbol}}
 
   arg_params :: Dict{Base.Symbol, NDArray}
   aux_params :: Dict{Base.Symbol, NDArray}
 
-  MXModule(arch :: SymbolicNode) = new(arch)
-end
-function MXModule(arch :: SymbolicNode, 
-                  context::Union{Void, Context, Vector{Context}})
-  mod = MXModule(arch)
-  if isa(context, Void)
-    mod.context = [Context(CPU)]
-  elseif isa(context, Context)
-    mod.context = [context]
-  else
-    mod.context = context
-  end
+  function MXModule(arch :: SymbolicNode;
+                    context::Union{Void, Context, Vector{Context}} = nothing,
+                    data_names :: Union{Void, Base.Symbol, Vector{Base.Symbol}}=nothing)
+    mod = new(arch)
+    if isa(context, Void)
+      mod.context = [Context(CPU)]
+    elseif isa(context, Context)
+      mod.context = [context]
+    else
+      mod.context = context
+    end
 
+    if isa(data_names, Base.Symbol)
+      data_names = [data_names]
+    end
+    mod.data_names = data_names
+
+    return mod
+  end
 end
 
 function bind!(mod :: MXModule, data_provider :: AbstractDataProvider; 
+               overwrite_data_names=true,
                freeze_param_names :: Union{Void, Vector{Symbol}} = nothing,
                for_training :: Bool=true,
                inputs_need_grad :: Bool=false, 
@@ -67,6 +75,20 @@ function bind!(mod :: MXModule, data_provider :: AbstractDataProvider;
     @assert !inputs_need_grad
   end
 
+  data_names = map((x) -> x[1], provide_data(data_provider))
+  if overwrite_data_names
+    @assert issubset(Set(data_names), list_arguments(mod.arch))
+    mod.data_names = data_names
+  else
+    if isa(mod.data_names, Void)
+      @assert issubset([:data], list_arguments(mod.arch))
+      @assert data_names == [:data]
+    else
+      @assert Set(mod.data_names) == Set(data_names)
+      @assert issubset(Set(data_names), list_arguments(mod.arch))
+    end
+  end
+
   mod.opts.for_training = for_training
   mod.opts.inputs_need_grad = inputs_need_grad
   mod.opts.binded = true
@@ -78,14 +100,15 @@ function bind!(mod :: MXModule, data_provider :: AbstractDataProvider;
     shared_group = shared_module.exec_group
   else
     shared_group = nothing
-  end
-
-  mod.exec_group = DataParallelExecutorGroup(mod.arch, mod.context, mod.data_provider,
-                                             freeze_param_names=freeze_param_names,
-                                             for_training=for_training, 
-                                             inputs_need_grad=inputs_need_grad,
-                                             shared_group=shared_group, 
-                                             grad_req=grad_req)
+  end 
+  
+  mod.exec_group = DataParallelExecutorGroup(
+    mod.arch, mod.context, mod.data_provider, 
+    freeze_param_names=freeze_param_names,
+    for_training=for_training, 
+    inputs_need_grad=inputs_need_grad,
+    shared_group=shared_group, 
+    grad_req=grad_req)
 
   if !isa(shared_module, Void)
     mod.opts.params_initialized = true
@@ -322,11 +345,32 @@ function load_optimizer_states(mod :: MXModule, fname :: AbstractString)
   end
 end
 
-"""
-    data_names(module)
-
-A list of names for data required by this module.
-"""
 function data_names(mod :: MXModule)
-  
+  if !isa(mod.data_names, Void)
+    mod.data_names 
+  else
+    [:data]
+  end
+end
+
+function output_names(mod :: MXModule)
+  list_outputs(mod.arch)
+end
+
+################################################################################
+# Input/Output information
+################################################################################
+function data_shapes(mod :: MXModule)
+  @assert mod.opts.binded
+  return map((x) -> tuple(x[1], tuple(x[2][1:(end - 1)]..., data.sample_count)), mx.provide_data(data))
+end
+
+function label_shapes(mod :: MXModule)
+  @assert mod.opts.binded
+  return map((x) -> tuple(x[1], tuple(x[2][1:(end - 1)]..., data.sample_count)), mx.provide_label(data))
+end
+
+function output_shapes(mod :: MXModule)
+  @assert mod.opts.binded
+  return out_shapes
 end
