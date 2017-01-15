@@ -36,7 +36,7 @@ type MXModule <: AbstractModule
   function MXModule(arch :: SymbolicNode;
                     context::Union{Void, Context, Vector{Context}} = nothing,
                     data_names :: Union{Void, Base.Symbol, Vector{Base.Symbol}}=nothing)
-    mod = new(arch)
+    mod = new(arch, ModuleState())
     if isa(context, Void)
       mod.context = [Context(CPU)]
     elseif isa(context, Context)
@@ -128,7 +128,7 @@ function bind!(mod :: MXModule, data_provider :: AbstractDataProvider;
 end
 
 
-function init_params!(mod :: MXModule, initializer :: AbstractInitializer=UniformInitializer(0.01), 
+function init_params!(mod :: MXModule; initializer :: AbstractInitializer=UniformInitializer(0.01), 
                       arg_params :: Dict{Base.Symbol, NDArray}=Dict{Base.Symbol, NDArray}(),
                       aux_params :: Dict{Base.Symbol, NDArray}=Dict{Base.Symbol, NDArray}(),
                     	allow_missing :: Bool=false, force_init :: Bool=false)
@@ -196,7 +196,7 @@ function _create_kvstore(kvstore :: KVStore, num :: Int, arg_params)
   kvstore, true
 end
 # TODO add description
-function init_optimizer!(mod :: MXModule, optimizer, kvstore; force_init :: Bool = false)
+function init_optimizer!(mod :: MXModule; optimizer=ADAM(), kvstore :: Union{Base.Symbol, KVStore}=:local, force_init :: Bool=false)
   @assert mod.opts.binded && mod.opts.params_initialized
 
   if mod.opts.optimizer_initialized && !force_init
@@ -206,7 +206,7 @@ function init_optimizer!(mod :: MXModule, optimizer, kvstore; force_init :: Bool
 
   # TODO initialize KV store
   # setup kvstore
-  kvstore, update_on_kvstore = _create_kvstore(kvstore, length(mod.ctx), mod.arg_params)
+  kvstore, update_on_kvstore = _create_kvstore(kvstore, length(mod.context), mod.arg_params)
 
   mod.optimizer = optimizer
   mod.kvstore = kvstore

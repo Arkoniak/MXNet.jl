@@ -605,6 +605,45 @@ function init_optimizer!(mod, kvstore=:local, optimizer=SGD(), force_init=false)
 end
 
 ################################################################################
+# State information
+################################################################################
+
+"""
+    isbinded(self::AbstractModule) -> Bool
+"""
+function isbinded(self::AbstractModule)
+  return self.opts.binded
+end
+
+"""
+    allows_training(self::AbstractModule) -> Bool
+"""
+function allows_training(self::AbstractModule)
+  return self.opts.for_training
+end
+
+"""
+    isinitialized(self::AbstractModule) -> Bool
+"""
+function isinitialized(self::AbstractModule)
+  return self.opts.params_initialized
+end
+
+"""
+    hasoptimizer(self::AbstractModule) -> Bool
+"""
+function hasoptimizer(self::AbstractModule)
+  return self.opts.optimizer_initialized
+end
+
+"""
+    inputs_need_grad(self::AbstractModule) -> Bool
+"""
+function inputs_need_grad(self :: AbstractModule)
+  return self.opts.inputs_need_grad
+end
+
+################################################################################
 # Optional
 ################################################################################
 """
