@@ -27,7 +27,7 @@ end
 
 function test_basic()
   info("SymbolModule::basic")
-  
+
   m1 = mx.Module.SymbolModule(create_network())
 
   @test !mx.Module.isbinded(m1)
@@ -37,7 +37,7 @@ function test_basic()
 
   @test mx.Module.data_names(m1) == [:data]
   @test mx.Module.output_names(m1) == [:softmax_output]
-  
+
   mx.Module.bind(m1, [(20, 20, 1, 10)], [(20, 20, 1, 10)])
   @test mx.Module.isbinded(m1)
   @test !mx.Module.isinitialized(m1)
@@ -52,7 +52,7 @@ end
 
 function test_init_params()
   info("SymbolModule::InitParams")
-  m1 = mx.Module.SymbolModule(create_single_neuron(), 
+  m1 = mx.Module.SymbolModule(create_single_neuron(),
                               label_names = [:linout_label])
   mx.Module.bind(m1, [(1, 10)], [(1, 10)])
   mx.Module.init_params(m1)
