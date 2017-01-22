@@ -9,6 +9,14 @@ function forward(self::AbstractExecutorGroup, data_provider :: AbstractDataProvi
   throw(MethodError(forward, (self, )))
 end
 
+"""
+    DataParallelExecutorGroup
+
+Supports:
+  - Fixed parameters (freezing)
+  - Shape inference
+  - Type inference
+"""
 type DataParallelExecutorGroup <: AbstractExecutorGroup
   symbol :: SymbolicNode
   context :: Vector{Context}
@@ -39,15 +47,16 @@ type DataParallelExecutorGroup <: AbstractExecutorGroup
   param_names :: Vector{Symbol}
   aux_names :: Vector{Symbol}
 end
+
 function DataParallelExecutorGroup(symbol::SymbolicNode, context::Vector{Context},
-           data_shapes, data_names, label_shapes, label_names, for_training, inputs_need_grad,
-           shared_group, fixed_param_names, grad_req)
+           data_shapes, data_names, data_types, label_shapes, label_names, label_types,
+           for_training, inputs_need_grad, shared_group, fixed_param_names, grad_req)
 
   num_dev = length(context)
   arg_names  = list_arguments(symbol)
   input_names = [data_names; label_names]
   param_names  = setdiff(arg_names, input_names)
-  aux_names = list_auxiliary_states(symbol) 
+  aux_names = list_auxiliary_states(symbol)
 
   batch_size = data_shapes[1][end]
   for shape in data_shapes
@@ -59,27 +68,40 @@ function DataParallelExecutorGroup(symbol::SymbolicNode, context::Vector{Context
     end
   end
 
-  # TODO imlplement workload
+  # TODO implement workload
   slices = _split_inputs(batch_size, num_dev)
 
   execs = Vector{Executor}(num_dev)
 
-  provided_shapes = merge(Dict(name => shape for (name, shape) in zip(data_names, data_shapes)),
-                          Dict(name => shape for (name, shape) in zip(label_names, label_shapes)))
+  # Shape inference based on data_shapes and label_shapes
+  provided_shapes = merge(
+      Dict(name => shape for (name, shape) in zip(data_names, data_shapes)),
+      Dict(name => shape for (name, shape) in zip(label_names, label_shapes))
+  )
+
   arg_shapes, out_shapes, aux_shapes = infer_shape(symbol; provided_shapes...)
   @assert(!isa(arg_shapes, Void), "Information not enough to perform complete shape inference")
 
+  # Type inference based on data_types and lable_types
+  provided_types = merge(
+      Dict(name => _type for (name, _type) in zip(data_names, data_types)),
+      Dict(name => _type for (name, _type) in zip(label_names, label_types))
+  )
+
+  arg_types, out_types, aux_types = infer_type(symbol; provided_types...)
+
+  # Check for what arg we needs gradients and which are frozen
   grad_req, freeze_idx = get_grads(symbol, param_names, arg_names, data_names, inputs_need_grad, fixed_param_names, grad_req)
 
   arg_params = Dict{Symbol, NDArray}()
   aux_params = Dict{Symbol, NDArray}()
 
-  for (name, shape) in filter(x -> in(x[1], param_names), zip(arg_names, arg_shapes))
-    arg_params[name] = empty(shape)
+  for (name, shape, T) in filter(x -> in(x[1], param_names), zip(arg_names, arg_shapes, arg_types))
+    arg_params[name] = empty(T, shape)
   end
 
-  for (name, shape) in zip(aux_names, aux_shapes)
-    aux_params[name] = empty(shape)
+  for (name, shape, T) in zip(aux_names, aux_shapes, aux_types)
+    aux_params[name] = empty(T, shape)
   end
 
   for i = 1:num_dev
@@ -99,21 +121,19 @@ function DataParallelExecutorGroup(symbol::SymbolicNode, context::Vector{Context
     else
       provided_data_names = [data_names; label_names]
     end
-    shapes = filter(x -> !in(x[1], provided_data_names), shapes)
+    arg_info = filter(x -> !in(x[1], provided_data_names), arg_info)
 
     # Remove all gradients for nop params
-    shapes = filter(x -> grad_req[x[1]] != GRAD_NOP, shapes)
+    arg_info = filter(x -> grad_req[x[1]] != GRAD_NOP, arg_info)
 
-    for (name, shape) in shapes
-      grad_arrays[name] = zeros(shape, context[i])
+    for (name, shape, T) in arg_info
+      grad_arrays[name] = zeros(T, shape, context[i])
     end
 
     execs[i] = bind(symbol, context[i], arg_arrays, args_grad=grad_arrays, grad_req=grad_req, aux_states=aux_arrays)
     #= dbg_str = mx.debug_str(train_execs[i]) =#
     #= info(string("TempSpace: ", split(dbg_str, ['\n'])[end-2]..., " on ", self.ctx[i])) =#
   end
-
-  # TODO: perform type inference
 
   # set up input data structures
   data_arrays  = [SlicedNDArray[(slices[i], exec.arg_dict[name]) for (i,exec) in enumerate(execs)] for name in data_names]
@@ -152,7 +172,6 @@ Split `data_batch` according to workload and run forward on each devices.
 function forward(self:: DataParallelExecutorGroup, data_provider :: AbstractDataProvider, data_batch :: AbstractDataBatch, is_train::Bool = self.for_training)
 
   load_data!(data_provider, data_batch, self.data_arrays)
-  
   if is_train && !isempty(get_label(data_provider, data_batch))
     load_label!(data_provider, data_batch, self.label_arrays)
   end
