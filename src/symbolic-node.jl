@@ -656,9 +656,9 @@ function _define_atomic_symbol_creator(name :: String)
       end
     end
 
-    if length(args) != 0 && length(symbol_kws) != 0
-      @assert(false, $name * " only accepts SymbolicNode either as positional or keyword arguments, not both.")
-    end
+    #= if length(args) != 0 && length(symbol_kws) != 0 =#
+    #=   @assert(false, $name * " only accepts SymbolicNode either as positional or keyword arguments, not both.") =#
+    #= end =#
     $(if key_narg != ""
       quote
         if length(symbol_kws) > 0
