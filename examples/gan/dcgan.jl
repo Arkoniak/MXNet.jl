@@ -1,4 +1,5 @@
 using MXNet
+import MXNet.mx: provide_data, provide_label, get_batch_size
 
 function get_mnist_data(batch_size=100)
   include(joinpath(dirname(@__FILE__), "..", "common", "mnist-data.jl"))
@@ -24,6 +25,7 @@ function make_dcgan_mnist(ngf=64, ndf=64, nc=3, no_bias=true, fix_gamma=true, ep
 
   label = mx.Variable(:label)
   dloss = @mx.chain mx.Variable(:data) =>
+          mx.Reshape(shape=(28, 28, 1, -1)) =>
           mx.Convolution(name=:d1, kernel=(4, 4), stride=(2, 2), pad=(1, 1), num_filter=ndf, no_bias=no_bias) =>
           mx.LeakyReLU(name=:dact1, act_type=:leaky, slope=0.2) =>
 
@@ -96,22 +98,22 @@ symG, symD = make_dcgan_mnist()
 # RandomDataProvider
 ####################################################
 
-type mx.RandomDataProvider <: mx.AbstractDataProvider
+type RandomDataProvider <: mx.AbstractDataProvider
   batch_size :: Int
   shape :: Tuple{Vararg{Int}}
 
   data_name :: Symbol
 end
-mx.RandomDataProvider(batch_size, shape) = mx.RandomDataProvider(batch_size, shape, :rand)
+RandomDataProvider(batch_size, shape) = RandomDataProvider(batch_size, shape, :rand)
 
-provide_data(provider :: mx.RandomDataProvider) = [(provider.data_name, (provider.shape..., provider.batch_size))]
-provide_label(provider :: mx.RandomDataProvider) = []
-get_batch_size(provider :: mx.RandomDataProvider) = provider.batch_size
+provide_data(provider :: RandomDataProvider) = [(provider.data_name, (provider.shape..., provider.batch_size))]
+provide_label(provider :: RandomDataProvider) = []
+get_batch_size(provider :: RandomDataProvider) = provider.batch_size
 
-Base.eltype(provider :: mx.RandomDataProvider) = mx.DataBatch
-Base.start(provider :: mx.RandomDataProvider) = nothing
-Base.done(provider :: mx.RandomDataProvider, state) = false
-function Base.next(provider :: mx.RandomDataProvider, state::Void = nothing)
+Base.eltype(provider :: RandomDataProvider) = mx.DataBatch
+Base.start(provider :: RandomDataProvider) = nothing
+Base.done(provider :: RandomDataProvider, state) = false
+function Base.next(provider :: RandomDataProvider, state::Void = nothing)
   mx.DataBatch(mx.NDArray[mx.copy(rand(Float32, (provider.shape..., provider.batch_size)), mx.cpu())],
                mx.NDArray[], provider.batch_size), nothing
 end
@@ -124,42 +126,44 @@ batch_size = 100
 lr = 0.002
 beta1 = 0.5
 wd = 0.0
+Z = 100
 
 train_data, test_data = get_mnist_data(9)
 
 imshow(x, thr = 0) = join(mapslices(join, (x->x ? 'X': ' ').(x'.> thr), 2), "\n") |> print
 
-for batch in mx.eachdatabatch(train_data)
-  imshow(mx.copy(mx.Reshape(batch.data[1], shape=(-1, 28, 28)))[:, :, 5], 0.4)
-  break
-end
+#= for batch in mx.eachdatabatch(train_data) =#
+#=   imshow(mx.copy(mx.Reshape(batch.data[1], shape=(-1, 1, 28, 28)))[:, :, 5], 0.4) =#
+#=   break =#
+#= end =#
 
 ####################################################
 # Module G
 ####################################################
 
-rnd = mx.RandomDataProvider(batch_size, (28, 28))
+rnd = RandomDataProvider(batch_size, (Z, 1, 1))
 modG = mx.Module.SymbolModule(symG, data_names=[:rand], label_names=Symbol[], context = ctx)
 mx.Module.bind(modG, rnd)
 mx.Module.init_params(modG, initializer = mx.NormalInitializer(mu = 0.02))
-mx.Module.init_optimizer(modG, optimizer=mx.ADAM(lr=lr, beta1=beta1, wd=wd))
+mx.Module.init_optimizer(modG, optimizer=mx.ADAM(lr=lr, beta1=beta1, weight_decay=wd))
 mods = [modG]
 
 ####################################################
 # Module D
 ####################################################
 
-modD = mx.Module.SymbolModule(symD, data_names=[:data], label_names=[:label], context = ctx)
+modD = mx.Module.SymbolModule(symD, data_names=[:data], label_names=[:dloss_label], context = ctx)
 mx.Module.bind(modD, train_data, inputs_need_grad=true)
 mx.Module.init_params(modD, initializer = mx.NormalInitializer(mu = 0.02))
-mx.Module.init_optimizer(modD, optimizer=mx.ADAM(lr=lr, beta1=beta1, wd=wd))
+mx.Module.init_optimizer(modD, optimizer=mx.ADAM(lr=lr, beta1=beta1, weight_decay=wd))
 mods = push!(mods, modD)
 
 
-for i, batch in enumerate(mx.eachdatabatch(train_provider))
-  rbatch = next(rnd)
+for (i, batch) in enumerate(mx.eachdatabatch(train_data))
+  info(i)
+  rbatch = next(rnd)[1]
 
-  forward(modG, true)
+  mx.Module.forward(modG, rbatch, true)
 end
 
 
