@@ -67,8 +67,8 @@ function SymbolModule(symbol::SymbolicNode;
                       context::Union{Context, Vector{Context}} = [mx.cpu()],
                       fixed_param_names = nothing)
   fixed_param_names = Nullable{Vector{Symbol}}(fixed_param_names)
-  label_names = Vector{Symbol}(label_names)
-  context = Vector{Context}(context)
+  label_names = Vector(label_names)
+  context = Vector(context)
   @assert !isempty(data_names)
   @assert !isempty(context)
   return SymbolModule(symbol, data_names, label_names, context, fixed_param_names)

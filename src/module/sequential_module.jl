@@ -31,6 +31,7 @@ type SequentialModule <: AbstractModule
   label_names :: Vector{Symbol}
   label_shapes :: Vector{Tuple{Vararg{Int}}}
   function SequentialModule(label_names = [:softmax_label])
+    info("SequentialModule:: label_names = $label_names")
     new(Vector{AbstractModule}(),
         Vector{Symbol}[],
         false, false, false, false, false,
@@ -106,7 +107,7 @@ end
 
 function label_shapes(self::SequentialModule)
   !isbinded(self) && return Dict{Symbol, Vector{Tuple{Int}}}()
-  return self.label_shapes
+  return Dict(k => v for (k, v) in zip(self.label_names, self.label_shapes))
 end
 
 function output_shapes(self::SequentialModule)
@@ -138,7 +139,7 @@ function init_params(self::SequentialModule, opts::ModuleInitParamsOptions)
   duplicates = false
   for (i, mod) in enumerate(self.modules)
     arg_params, aux_params = get_params(mod)
-    map((arg_dict, arg_params), (aux_dict, aux_params)) do arg
+    map([(arg_dict, arg_params), (aux_dict, aux_params)]) do arg
       dict, params = arg
       for name in keys(params)
         if haskey(dict, name)

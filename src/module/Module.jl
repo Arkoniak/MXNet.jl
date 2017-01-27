@@ -536,6 +536,16 @@ function forward_backward(self :: AbstractModule, data_batch)
   backward(self)
 end
 
+####################################################
+# Utils
+####################################################
+
+Base.convert{T}(::Type{Vector}, x::T) = [x]
+
+####################################################
+# Includes
+####################################################
+
 # include implementations
 include("symbol_module.jl")
 # include("pipeline.jl")
