@@ -680,7 +680,7 @@ function _define_atomic_symbol_creator(name :: String)
       set_attr(node, k, v)
     end
 
-    if length(args) > 1
+    if length(symbol_kws) == 0
       _compose!(node, name, args...)
     elseif length(args) == 1
       _compose!(node; name=name, data=args[1], symbol_kws...)
